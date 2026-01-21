@@ -69,9 +69,21 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     addMessageDto.userId = userId;
     addMessageDto.roomId = user.room.id;
 
-    await this.roomService.addMessage(addMessageDto);
+    const message = await this.roomService.addMessage(addMessageDto);
 
-    client.to(user.room.id).emit('message', addMessageDto.text);
+    // Emit full message object with user info
+    const messageData = {
+      id: message.id,
+      text: message.text,
+      created_at: message.created_at,
+      user: {
+        id: user.id,
+        username: user.username,
+        avatar: user.avatar,
+      },
+    };
+
+    this.server.to(user.room.id).emit('message', messageData);
   }
 
   @SubscribeMessage('join')
@@ -90,7 +102,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     client.join(roomId);
 
-    client.emit('message', messages);
+    // Format messages with user info
+    const formattedMessages = messages.map((msg) => ({
+      id: msg.id,
+      text: msg.text,
+      created_at: msg.created_at,
+      user: {
+        id: msg.user?.id,
+        username: msg.user?.username,
+        avatar: msg.user?.avatar,
+      },
+    }));
+
+    client.emit('message', formattedMessages);
   }
 
   @SubscribeMessage('leave')

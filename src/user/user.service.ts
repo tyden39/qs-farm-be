@@ -45,6 +45,8 @@ export class UserService {
   async create(createUserDto: CreateUserDto) {
     const user = await this.userRepository.create({
       ...createUserDto,
+      avatar: createUserDto.avatar || 'https://ui-avatars.com/api/?name=' + createUserDto.username,
+      is_admin: createUserDto.is_admin || false,
     });
 
     return this.userRepository.save(user);

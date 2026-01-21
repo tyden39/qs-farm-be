@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nest Websockets Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* Auth Screen */
+        .auth-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            width: 100%;
+        }
+
+        .auth-screen.hidden {
+            display: none;
+        }
+
+        .auth-card {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .auth-card h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 28px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .auth-toggle {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        .auth-toggle a {
+            color: #667eea;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .alert-error {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+        }
+
+        .alert-success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-left: 4px solid #2e7d32;
+        }
+
+        /* Chat Screen */
+        .chat-screen {
+            display: none;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 1400px;
+            height: 90vh;
+            max-height: 800px;
+            overflow: hidden;
+        }
+
+        .chat-screen.active {
+            display: flex;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: #f8f9fa;
+            border-left: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            order: 2;
+        }
+
+        .user-info {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            background: white;
+        }
+
+        .user-info h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .user-info p {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 5px;
+        }
+
+        .logout-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 10px;
+            width: 100%;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #ff5252;
+        }
+
+        .create-room-section {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .create-room-section h4 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .create-room-input {
+            display: flex;
+            gap: 8px;
+        }
+
+        .create-room-input input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+
+        .create-room-input button {
+            padding: 8px 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .create-room-input button:hover {
+            background: #764ba2;
+        }
+
+        .rooms-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .room-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .room-item:hover {
+            background: #f0f0f0;
+            border-left-color: #667eea;
+        }
+
+        .room-item.active {
+            background: #667eea;
+            color: white;
+            border-left-color: #764ba2;
+        }
+
+        /* Main Chat Area */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            order: 1;
+        }
+
+        .chat-header {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            background: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h2 {
+            color: #333;
+            font-size: 20px;
+        }
+
+        .room-info {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .room-info span {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .leave-btn {
+            background: #ff9800;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+            display: none;
+        }
+
+        .leave-btn.show {
+            display: inline-block;
+        }
+
+        .leave-btn:hover {
+            background: #f57c00;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #fafafa;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message {
+            display: flex;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.own {
+            justify-content: flex-end;
+        }
+
+        .message-bubble {
+            max-width: 60%;
+            padding: 12px 16px;
+            border-radius: 10px;
+            word-wrap: break-word;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .message.other .message-bubble {
+            background: white;
+            color: #333;
+            border-bottom-left-radius: 0;
+        }
+
+        .message.own .message-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 0;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .message.own .message-header {
+            justify-content: flex-end;
+        }
+
+        .message-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .message-username {
+            color: #667eea;
+        }
+
+        .message.own .message-username {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .message-time {
+            color: #999;
+            font-size: 11px;
+            font-weight: normal;
+            margin-left: 4px;
+        }
+
+        .message.own .message-time {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .no-room {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #999;
+            font-size: 18px;
+        }
+
+        /* Message Input */
+        .message-input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .message-input-area input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .message-input-area input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .message-input-area button {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .message-input-area button:hover {
+            transform: translateY(-2px);
+        }
+
+        .message-input-area button:active {
+            transform: translateY(0);
+        }
+
+        .messages-area {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+        }
+
+        .messages-area.show {
+            display: flex;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .auth-card {
+                max-width: 100%;
+                padding: 30px 20px;
+            }
+
+            .chat-screen {
+                flex-direction: column;
+                max-height: 100vh;
+            }
+
+            .sidebar {
+                width: 100%;
+                max-height: 150px;
+                flex-direction: row;
+                overflow-x: auto;
+            }
+
+            .rooms-list {
+                flex-direction: row;
+                overflow-y: visible;
+                overflow-x: auto;
+                display: flex;
+                gap: 8px;
+            }
+
+            .room-item {
+                min-width: 150px;
+                flex-shrink: 0;
+            }
+
+            .message-bubble {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Auth Screen -->
+    <div id="authScreen" class="auth-screen">
+        <div class="auth-card">
+            <h1 id="authTitle">Đăng nhập</h1>
+            <div id="alerts"></div>
+            
+            <!-- Sign In Form -->
+            <form id="signInForm">
+                <div class="form-group">
+                    <label for="signInUsername">Tên người dùng</label>
+                    <input type="text" id="signInUsername" placeholder="Nhập tên người dùng" required>
+                </div>
+                <div class="form-group">
+                    <label for="signInPassword">Mật khẩu</label>
+                    <input type="password" id="signInPassword" placeholder="Nhập mật khẩu" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Đăng nhập</button>
+            </form>
+
+            <!-- Sign Up Form -->
+            <form id="signUpForm" style="display: none;">
+                <div class="form-group">
+                    <label for="signUpUsername">Tên người dùng</label>
+                    <input type="text" id="signUpUsername" placeholder="Chọn tên người dùng" required>
+                </div>
+                <div class="form-group">
+                    <label for="signUpPassword">Mật khẩu</label>
+                    <input type="password" id="signUpPassword" placeholder="Chọn mật khẩu" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Đăng ký</button>
+            </form>
+
+            <div class="auth-toggle">
+                <span id="toggleText">Chưa có tài khoản?</span>
+                <a id="toggleAuth"> Đăng ký ngay</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Screen -->
+    <div id="chatScreen" class="chat-screen">
+        <!-- Chat Area -->
+        <div class="chat-area">
+            <div class="chat-header">
+                <div>
+                    <h2 id="currentRoomName">Chọn phòng để bắt đầu</h2>
+                </div>
+                <div class="room-info">
+                    <span id="roomMemberCount">0 thành viên</span>
+                    <button type="button" class="leave-btn" id="leaveRoomBtn">Rời phòng</button>
+                </div>
+            </div>
+
+            <div id="messagesArea" class="messages-area">
+                <div class="messages-container" id="messagesContainer"></div>
+                <div class="message-input-area">
+                    <input type="text" id="messageInput" placeholder="Gửi tin nhắn...">
+                    <button type="button" id="sendBtn">Gửi</button>
+                </div>
+            </div>
+
+            <div class="no-room" id="noRoomSelected">
+                <p>Chọn một phòng hoặc tạo phòng mới để bắt đầu chat</p>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="user-info">
+                <h3>👤 <span id="currentUsername">User</span></h3>
+                <p>Trạng thái: <span id="connectionStatus" style="color: #ff9800;">Kết nối...</span></p>
+                <button class="logout-btn" id="logoutBtn">Đăng xuất</button>
+            </div>
+
+            <div class="create-room-section">
+                <h4>Tạo phòng chat</h4>
+                <div class="create-room-input">
+                    <input type="text" id="newRoomName" placeholder="Tên phòng" maxlength="50">
+                    <button type="button" id="createRoomBtn">Tạo</button>
+                </div>
+            </div>
+
+            <div class="rooms-list" id="roomsList">
+                <div style="color: #999; text-align: center; padding: 20px;">Không có phòng nào</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        // Configuration
+        const API_URL = 'http://localhost:3000';
+        const WS_URL = 'http://localhost:3000';
+
+        // State Management
+        let state = {
+            isAuthenticated: false,
+            currentUser: null,
+            currentUserId: null,
+            currentUserInfo: null,
+            accessToken: null,
+            currentRoom: null,
+            socket: null,
+            rooms: [],
+            messages: {}
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setupAuthListeners();
+            setupChatListeners();
+            checkAuthStatus();
+        });
+
+        // ============================================
+        // Auth Functions
+        // ============================================
+        function setupAuthListeners() {
+            document.getElementById('signInForm').addEventListener('submit', handleSignIn);
+            document.getElementById('signUpForm').addEventListener('submit', handleSignUp);
+            document.getElementById('toggleAuth').addEventListener('click', toggleAuthForm);
+            document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+        }
+
+        async function handleSignIn(e) {
+            e.preventDefault();
+            const username = document.getElementById('signInUsername').value;
+            const password = document.getElementById('signInPassword').value;
+
+            try {
+                const response = await fetch(`${API_URL}/auth/signIn`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    state.accessToken = data.accessToken;
+                    state.currentUser = username;
+                    state.isAuthenticated = true;
+                    
+                    // Decode JWT to get user ID
+                    try {
+                        const payload = JSON.parse(atob(data.accessToken.split('.')[1]));
+                        state.currentUserId = payload.id;
+                        localStorage.setItem('userId', payload.id);
+                    } catch (e) {
+                        console.error('Error decoding token:', e);
+                    }
+                    
+                    localStorage.setItem('accessToken', data.accessToken);
+                    localStorage.setItem('username', username);
+                    showAlert('Đăng nhập thành công!', 'success');
+                    switchToChat();
+                } else {
+                    showAlert(data.message || 'Đăng nhập thất bại', 'error');
+                }
+            } catch (error) {
+                console.error('Sign in error:', error);
+                showAlert('Lỗi kết nối: ' + error.message, 'error');
+            }
+        }
+
+        async function handleSignUp(e) {
+            e.preventDefault();
+            const username = document.getElementById('signUpUsername').value;
+            const password = document.getElementById('signUpPassword').value;
+
+            try {
+                const response = await fetch(`${API_URL}/auth/signUp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    state.accessToken = data.accessToken;
+                    state.currentUser = username;
+                    state.isAuthenticated = true;
+                    
+                    // Decode JWT to get user ID
+                    try {
+                        const payload = JSON.parse(atob(data.accessToken.split('.')[1]));
+                        state.currentUserId = payload.id;
+                        localStorage.setItem('userId', payload.id);
+                    } catch (e) {
+                        console.error('Error decoding token:', e);
+                    }
+                    
+                    localStorage.setItem('accessToken', data.accessToken);
+                    localStorage.setItem('username', username);
+                    showAlert('Đăng ký thành công!', 'success');
+                    switchToChat();
+                } else {
+                    showAlert(data.message || 'Đăng ký thất bại', 'error');
+                }
+            } catch (error) {
+                console.error('Sign up error:', error);
+                showAlert('Lỗi kết nối: ' + error.message, 'error');
+            }
+        }
+
+        function toggleAuthForm() {
+            const signInForm = document.getElementById('signInForm');
+            const signUpForm = document.getElementById('signUpForm');
+            const authTitle = document.getElementById('authTitle');
+            const toggleText = document.getElementById('toggleText');
+            const toggleLink = document.getElementById('toggleAuth');
+
+            const isSignIn = signInForm.style.display !== 'none';
+
+            if (isSignIn) {
+                signInForm.style.display = 'none';
+                signUpForm.style.display = 'block';
+                authTitle.textContent = 'Đăng ký';
+                toggleText.textContent = 'Đã có tài khoản?';
+                toggleLink.textContent = 'Đăng nhập';
+            } else {
+                signInForm.style.display = 'block';
+                signUpForm.style.display = 'none';
+                authTitle.textContent = 'Đăng nhập';
+                toggleText.textContent = 'Chưa có tài khoản?';
+                toggleLink.textContent = 'Đăng ký ngay';
+            }
+        }
+
+        function switchToChat() {
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('chatScreen').classList.add('active');
+            document.getElementById('currentUsername').textContent = state.currentUser;
+            initializeWebSocket();
+            loadRooms();
+        }
+
+        async function handleLogout() {
+            state.isAuthenticated = false;
+            state.accessToken = null;
+            state.currentUser = null;
+            state.currentUserId = null;
+            state.currentUserInfo = null;
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('username');
+            localStorage.removeItem('userId');
+            if (state.socket) {
+                state.socket.disconnect();
+                state.socket = null;
+            }
+            document.getElementById('chatScreen').classList.remove('active');
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('signInForm').reset();
+            document.getElementById('signUpForm').reset();
+            document.getElementById('signInForm').style.display = 'block';
+            document.getElementById('signUpForm').style.display = 'none';
+            document.getElementById('authTitle').textContent = 'Đăng nhập';
+        }
+
+        function checkAuthStatus() {
+            const token = localStorage.getItem('accessToken');
+            const username = localStorage.getItem('username');
+            const userId = localStorage.getItem('userId');
+            if (token && username) {
+                state.accessToken = token;
+                state.currentUser = username;
+                state.currentUserId = userId;
+                state.isAuthenticated = true;
+                
+                // If userId not in localStorage, try to decode from token
+                if (!userId) {
+                    try {
+                        const payload = JSON.parse(atob(token.split('.')[1]));
+                        state.currentUserId = payload.id;
+                        localStorage.setItem('userId', payload.id);
+                    } catch (e) {
+                        console.error('Error decoding token:', e);
+                    }
+                }
+                
+                switchToChat();
+            }
+        }
+
+        // ============================================
+        // WebSocket Functions
+        // ============================================
+        function initializeWebSocket() {
+            state.socket = io(WS_URL, {
+                query: {
+                    token: state.accessToken
+                },
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                reconnectionAttempts: 5
+            });
+
+            state.socket.on('connect', () => {
+                console.log('WebSocket connected');
+                updateConnectionStatus('Kết nối thành công', '#2e7d32');
+            });
+
+            state.socket.on('disconnect', () => {
+                console.log('WebSocket disconnected');
+                updateConnectionStatus('Ngắt kết nối', '#ff9800');
+            });
+
+            state.socket.on('message', (data) => {
+                console.log('Message received:', data);
+                if (Array.isArray(data)) {
+                    // Initial message history
+                    if (state.currentRoom) {
+                        state.messages[state.currentRoom.id] = data;
+                    }
+                    renderMessages();
+                } else {
+                    // New message
+                    if (state.currentRoom) {
+                        if (!state.messages[state.currentRoom.id]) {
+                            state.messages[state.currentRoom.id] = [];
+                        }
+                        state.messages[state.currentRoom.id].push(data);
+                        renderMessages();
+                    }
+                }
+            });
+
+            state.socket.on('kicked', (reason) => {
+                showAlert(`Bạn bị kick khỏi phòng: ${reason}`, 'error');
+                state.currentRoom = null;
+                renderChatArea();
+                loadRooms();
+            });
+
+            state.socket.on('banned', (reason) => {
+                showAlert(`Bạn bị ban: ${reason}`, 'error');
+                state.currentRoom = null;
+                renderChatArea();
+                loadRooms();
+            });
+
+            state.socket.on('connect_error', (error) => {
+                console.error('WebSocket connection error:', error);
+            });
+        }
+
+        function updateConnectionStatus(text, color) {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.textContent = text;
+            statusEl.style.color = color;
+        }
+
+        // ============================================
+        // Chat Functions
+        // ============================================
+        function setupChatListeners() {
+            document.getElementById('messageInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+            document.getElementById('sendBtn').addEventListener('click', sendMessage);
+            document.getElementById('leaveRoomBtn').addEventListener('click', leaveRoom);
+            document.getElementById('createRoomBtn').addEventListener('click', createRoom);
+        }
+
+        async function loadRooms() {
+            try {
+                const response = await fetch(`${API_URL}/room`, {
+                    headers: {
+                        'Authorization': `Bearer ${state.accessToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    state.rooms = data;
+                    renderRooms();
+                } else if (response.status === 401) {
+                    handleLogout();
+                }
+            } catch (error) {
+                console.error('Error loading rooms:', error);
+                showAlert('Lỗi tải phòng chat', 'error');
+            }
+        }
+
+        function renderRooms() {
+            const roomsList = document.getElementById('roomsList');
+            
+            if (state.rooms.length === 0) {
+                roomsList.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">Không có phòng nào</div>';
+                return;
+            }
+
+            roomsList.innerHTML = state.rooms.map(room => `
+                <div class="room-item ${state.currentRoom?.id === room.id ? 'active' : ''}" onclick="selectRoom('${room.id}', '${room.name}')">
+                    <strong>${room.name}</strong>
+                    <div style="font-size: 12px; opacity: 0.7; margin-top: 4px;">${room.users?.length || 0} thành viên</div>
+                </div>
+            `).join('');
+        }
+
+        async function createRoom() {
+            const roomName = document.getElementById('newRoomName').value.trim();
+
+            if (!roomName) {
+                showAlert('Vui lòng nhập tên phòng', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/room`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${state.accessToken}`
+                    },
+                    body: JSON.stringify({ name: roomName })
+                });
+
+                if (response.ok) {
+                    document.getElementById('newRoomName').value = '';
+                    showAlert('Phòng chat được tạo thành công!', 'success');
+                    loadRooms();
+                } else {
+                    showAlert('Không thể tạo phòng', 'error');
+                }
+            } catch (error) {
+                console.error('Error creating room:', error);
+                showAlert('Lỗi tạo phòng', 'error');
+            }
+        }
+
+        function selectRoom(roomId, roomName) {
+            const room = state.rooms.find(r => r.id === roomId);
+            if (!room) return;
+
+            state.currentRoom = room;
+            state.messages[roomId] = state.messages[roomId] || [];
+
+            renderRooms();
+            renderChatArea();
+
+            // Join room via WebSocket
+            if (state.socket && state.socket.connected) {
+                state.socket.emit('join', { roomId });
+            }
+        }
+
+        function renderChatArea() {
+            const messagesArea = document.getElementById('messagesArea');
+            const noRoomSelected = document.getElementById('noRoomSelected');
+            const leaveBtn = document.getElementById('leaveRoomBtn');
+
+            if (!state.currentRoom) {
+                messagesArea.classList.remove('show');
+                noRoomSelected.style.display = 'flex';
+                leaveBtn.classList.remove('show');
+                document.getElementById('currentRoomName').textContent = 'Chọn phòng để bắt đầu';
+                document.getElementById('roomMemberCount').textContent = '0 thành viên';
+            } else {
+                messagesArea.classList.add('show');
+                noRoomSelected.style.display = 'none';
+                leaveBtn.classList.add('show');
+                document.getElementById('currentRoomName').textContent = state.currentRoom.name;
+                document.getElementById('roomMemberCount').textContent = 
+                    `${state.currentRoom.users?.length || 0} thành viên`;
+                renderMessages();
+            }
+        }
+
+        function renderMessages() {
+            if (!state.currentRoom) return;
+
+            const container = document.getElementById('messagesContainer');
+            const messages = state.messages[state.currentRoom.id] || [];
+
+            container.innerHTML = messages.map((msg, idx) => {
+                // Handle both old format (string) and new format (object)
+                let messageText, messageUser, messageTime;
+                
+                if (typeof msg === 'string') {
+                    messageText = msg;
+                    messageUser = { username: 'Unknown', avatar: '' };
+                    messageTime = new Date();
+                } else {
+                    messageText = msg.text;
+                    messageUser = msg.user || { username: 'Unknown', avatar: '' };
+                    messageTime = msg.created_at ? new Date(msg.created_at) : new Date();
+                }
+
+                const isOwn = state.currentUserId && messageUser.id === state.currentUserId;
+                
+                const timeStr = formatTime(messageTime);
+                const avatarUrl = messageUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(messageUser.username)}`;
+                
+                return `
+                    <div class="message ${isOwn ? 'own' : 'other'}">
+                        <div class="message-bubble">
+                            <div class="message-header">
+                                <img src="${avatarUrl}" alt="${escapeHtml(messageUser.username)}" class="message-avatar">
+                                <span class="message-username">${escapeHtml(messageUser.username)}</span>
+                                <span class="message-time">${timeStr}</span>
+                            </div>
+                            <div>${escapeHtml(messageText)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function formatTime(date) {
+            if (!(date instanceof Date)) {
+                date = new Date(date);
+            }
+            const now = new Date();
+            const diff = now - date;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+
+            if (minutes < 1) return 'Vừa xong';
+            if (minutes < 60) return `${minutes} phút trước`;
+            if (hours < 24) return `${hours} giờ trước`;
+            if (days < 7) return `${days} ngày trước`;
+            
+            return date.toLocaleDateString('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+
+            if (!text || !state.currentRoom || !state.socket) {
+                return;
+            }
+
+            state.socket.emit('message', { text });
+            
+            // Don't add to local state here - wait for server response
+            // The server will emit the message back with full user info
+            
+            input.value = '';
+            input.focus();
+        }
+
+        function leaveRoom() {
+            if (!state.currentRoom || !state.socket) return;
+
+            state.socket.emit('leave', { roomId: state.currentRoom.id });
+            state.currentRoom = null;
+            renderRooms();
+            renderChatArea();
+            loadRooms();
+        }
+
+        // ============================================
+        // Utility Functions
+        // ============================================
+        function showAlert(message, type = 'info') {
+            const alertsContainer = document.getElementById('alerts');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+
+            alertsContainer.appendChild(alertDiv);
+
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

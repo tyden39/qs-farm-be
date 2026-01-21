@@ -1,0 +1,23 @@
+meta {
+  name: signIn
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:3000/auth/signIn
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "username": "admin",
+    "password": "123"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

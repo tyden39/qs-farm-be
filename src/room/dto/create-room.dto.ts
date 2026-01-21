@@ -4,11 +4,13 @@ export class CreateRoomDto {
   @IsString()
   readonly name: string;
 
+  @IsOptional()
   @IsString()
-  readonly description: string;
+  readonly description?: string;
 
+  @IsOptional()
   @IsString()
-  readonly avatar: string;
+  readonly avatar?: string;
 
   @IsOptional()
   @IsString()

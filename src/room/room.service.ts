@@ -40,7 +40,7 @@ export class RoomService {
 
   async findOneWithRelations(id: string) {
     const room = await this.roomRepository.findOne(id, {
-      relations: ['messages', 'users', 'bannedUsers'],
+      relations: ['messages', 'messages.user', 'users', 'bannedUsers'],
     });
 
     if (!room) {
@@ -58,7 +58,10 @@ export class RoomService {
 
   async create(createRoomDto: CreateRoomDto) {
     const room = await this.roomRepository.create({
-      ...createRoomDto,
+      name: createRoomDto.name,
+      description: createRoomDto.description || 'No description',
+      avatar: createRoomDto.avatar || 'https://ui-avatars.com/api/?name=' + createRoomDto.name,
+      ownerId: createRoomDto.ownerId,
     });
 
     return this.roomRepository.save(room);
@@ -76,7 +79,12 @@ export class RoomService {
       user,
     });
 
-    return this.messageRepository.save(message);
+    const savedMessage = await this.messageRepository.save(message);
+    
+    // Reload with user relation
+    return this.messageRepository.findOne(savedMessage.id, {
+      relations: ['user'],
+    });
   }
 
   async update(id: string, updateRoomDto: UpdateRoomDto) {

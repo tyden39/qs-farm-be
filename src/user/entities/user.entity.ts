@@ -22,10 +22,10 @@ export class User {
   @Column({ length: 60 })
   password: string;
 
-  @Column()
+  @Column({ type: 'varchar', default: '', nullable: true })
   avatar: string;
 
-  @Column()
+  @Column({ type: 'boolean', default: false })
   is_admin: boolean;
 
   @JoinTable()

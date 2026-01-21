@@ -17,10 +17,10 @@ export class Room {
   @Column({ length: 20 })
   name: string;
 
-  @Column({ length: 60 })
+  @Column({ length: 60, default: '' })
   description: string;
 
-  @Column()
+  @Column({ default: '' })
   avatar: string;
 
   @Column('uuid')

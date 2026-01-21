@@ -1,0 +1,25 @@
+meta {
+  name: signUp
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:3000/auth/signUp
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "username": "admin",
+    "password": "123",
+    "avatar": "",
+    "is_admin": false
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
