@@ -2,14 +2,10 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
-  JoinTable,
   OneToMany,
-  ManyToMany,
 } from 'typeorm';
 
-import { Room } from 'src/room/entities/room.entity';
-import { Message } from 'src/room/entities/message.entity';
+import { Farm } from 'src/farm/entities/farm.entity';
 
 @Entity()
 export class User {
@@ -28,14 +24,6 @@ export class User {
   @Column({ type: 'boolean', default: false })
   is_admin: boolean;
 
-  @JoinTable()
-  @ManyToOne(() => Room, (room: Room) => room.users)
-  room: Room;
-
-  @JoinTable()
-  @ManyToMany(() => Room, (room: Room) => room.bannedUsers, { eager: true })
-  bannedRooms: Array<Room>;
-
-  @OneToMany(() => Message, (message: Message) => message.user)
-  messages: Array<Message>;
+  @OneToMany(() => Farm, (farm: Farm) => farm.user)
+  farms: Array<Farm>;
 }

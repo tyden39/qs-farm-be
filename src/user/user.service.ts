@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,14 +7,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { User } from './entities/user.entity';
-import { Room } from 'src/room/entities/room.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
+    private readonly filesService: FilesService,
   ) {}
 
   async findAll() {
@@ -26,7 +26,7 @@ export class UserService {
 
   async findOne(id: string) {
     const user = await this.userRepository.findOne(id, {
-      relations: ['room'],
+      relations: ['farms'],
     });
 
     if (!user) {
@@ -65,30 +65,19 @@ export class UserService {
     return this.userRepository.save(user);
   }
 
-  async updateUserRoom(id: string, room: Room) {
-    const user = await this.userRepository.preload({
-      id,
-      room,
-    });
-
-    if (!user) {
-      throw new NotFoundException(`There is no user under id ${id}`);
-    }
-
-    const isBanned = user.bannedRooms?.find(
-      (bannedRoom) => bannedRoom.id === room?.id,
-    );
-
-    if (isBanned) {
-      throw new ForbiddenException(`You have been banned from this room`);
-    }
-
-    return this.userRepository.save(user);
-  }
-
   async remove(id: string) {
     const user = await this.findOne(id);
 
     return this.userRepository.remove(user);
+  }
+
+  async uploadAvatar(userId: string, file: Express.Multer.File) {
+    const user = await this.findOne(userId);
+
+    const uploadedFile = await this.filesService.create(file);
+
+    user.avatar = uploadedFile.file.path;
+    
+    return this.userRepository.save(user);
   }
 }

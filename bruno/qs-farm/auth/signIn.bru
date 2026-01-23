@@ -7,7 +7,12 @@ meta {
 post {
   url: http://localhost:3000/auth/signIn
   body: json
-  auth: inherit
+  auth: bearer
+}
+
+auth:bearer {
+  token: 
+  Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImRlNjMzMmY0LTQxNWYtNDIwZi1hZTZiLTA5MGU1ZWVhYTA4NSIsImlhdCI6MTc2OTA1NDQyMiwiZXhwIjoxNzY5MDU4MDIyfQ.RAtjq0RF77h7Xq8R2T7WLGBunFKqiWWRnrev1M5-kIc
 }
 
 body:json {

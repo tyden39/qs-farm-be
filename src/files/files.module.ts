@@ -1,24 +1,23 @@
-import { Module } from '@nestjs/common';
+import {
+  HttpStatus,
+  Module,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MulterModule } from '@nestjs/platform-express';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { diskStorage } from 'multer';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
-import {
-  HttpStatus,
-  UnprocessableEntityException,
-} from '@nestjs/common';
 
-import { UserService } from './user.service';
-import { UserController } from './user.controller';
-import { User } from './entities/user.entity';
-import { FilesModule } from '../files/files.module';
+import { File } from './entities/file.entity';
+import { FilesService } from './files.service';
+import { FilesController } from './files.controller';
 import { AllConfigType } from '../config/config.type';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
-    FilesModule,
+    ConfigModule,
+    TypeOrmModule.forFeature([File]),
     MulterModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -58,8 +57,8 @@ import { AllConfigType } from '../config/config.type';
       },
     }),
   ],
-  controllers: [UserController],
-  providers: [UserService],
-  exports: [UserService],
+  controllers: [FilesController],
+  providers: [FilesService],
+  exports: [FilesService],
 })
-export class UserModule {}
+export class FilesModule {}

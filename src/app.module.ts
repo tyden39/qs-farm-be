@@ -3,11 +3,14 @@ import { Module } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 
-import { ChatModule } from './chat/chat.module';
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
-import { RoomModule } from './room/room.module';
+import { FarmModule } from './farm/farm.module';
+import { DeviceModule } from './device/device.module';
+import { FilesModule } from './files/files.module';
+import { EmqxModule } from './emqx/emqx.module';
+import { ProvisionModule } from './provision/provision.module';
 
 @Module({
   imports: [
@@ -25,10 +28,13 @@ import { RoomModule } from './room/room.module';
       autoLoadEntities: true,
       synchronize: true,
     }),
-    ChatModule,
     UserModule,
     AuthModule,
-    RoomModule,
+    FarmModule,
+    DeviceModule,
+    FilesModule,
+    EmqxModule,
+    ProvisionModule,
   ],
   providers: [],
 })

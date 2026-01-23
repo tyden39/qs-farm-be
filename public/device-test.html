@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #1a202c;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+
+        .section h2 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #4a5568;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .status.connected {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status.disconnected {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .log {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-left: 3px solid #667eea;
+            padding-left: 10px;
+        }
+
+        .log-entry.error {
+            border-left-color: #f56565;
+            color: #fc8181;
+        }
+
+        .log-entry.success {
+            border-left-color: #48bb78;
+            color: #9ae6b4;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 Device WebSocket Test Client</h1>
+
+        <div id="status" class="status disconnected">
+            Disconnected
+        </div>
+
+        <!-- Connection Section -->
+        <div class="section">
+            <h2>Connection</h2>
+            <div class="form-group">
+                <label>JWT Token</label>
+                <input type="text" id="token" placeholder="Enter your JWT token">
+            </div>
+            <div class="btn-group">
+                <button class="btn-primary" onclick="connect()">Connect</button>
+                <button class="btn-danger" onclick="disconnect()">Disconnect</button>
+                <button class="btn-success" onclick="loginAndConnect()">Login & Connect</button>
+            </div>
+        </div>
+
+        <!-- Subscribe Section -->
+        <div class="section">
+            <h2>Subscribe to Device</h2>
+            <div class="form-group">
+                <label>Device ID</label>
+                <input type="text" id="deviceId" placeholder="Enter device ID">
+            </div>
+            <div class="btn-group">
+                <button class="btn-primary" onclick="subscribeToDevice()">Subscribe</button>
+                <button class="btn-danger" onclick="unsubscribeFromDevice()">Unsubscribe</button>
+            </div>
+        </div>
+
+        <!-- Command Section -->
+        <div class="section">
+            <h2>Send Command</h2>
+            <div class="form-group">
+                <label>Command</label>
+                <input type="text" id="command" placeholder="e.g., turnOn, setTemperature">
+            </div>
+            <div class="form-group">
+                <label>Parameters (JSON)</label>
+                <textarea id="params" rows="3" placeholder='{"value": 25}'></textarea>
+            </div>
+            <button class="btn-success" onclick="sendCommand()">Send Command</button>
+        </div>
+
+        <!-- Log Section -->
+        <div class="section">
+            <h2>Message Log</h2>
+            <div id="log" class="log"></div>
+            <button class="btn-danger" onclick="clearLog()" style="margin-top: 10px;">Clear Log</button>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        const API_BASE = '/api';
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function updateStatus(connected) {
+            const status = document.getElementById('status');
+            if (connected) {
+                status.className = 'status connected';
+                status.textContent = '✓ Connected';
+            } else {
+                status.className = 'status disconnected';
+                status.textContent = '✗ Disconnected';
+            }
+        }
+
+        async function loginAndConnect() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/signIn`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        username: 'admin', 
+                        password: '123' 
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('token').value = data.token;
+                    addLog('Login successful', 'success');
+                    connect();
+                } else {
+                    addLog('Login failed', 'error');
+                }
+            } catch (error) {
+                addLog('Login error: ' + error.message, 'error');
+            }
+        }
+
+        function connect() {
+            const token = document.getElementById('token').value;
+            
+            if (!token) {
+                addLog('Please enter JWT token', 'error');
+                return;
+            }
+
+            addLog('Connecting to WebSocket...');
+
+            socket = io('http://localhost:3000/device', {
+                auth: { token }
+            });
+
+            socket.on('connect', () => {
+                addLog('Connected to WebSocket', 'success');
+                updateStatus(true);
+            });
+
+            socket.on('disconnect', () => {
+                addLog('Disconnected from WebSocket', 'error');
+                updateStatus(false);
+            });
+
+            socket.on('connected', (data) => {
+                addLog('Server confirmation: ' + JSON.stringify(data), 'success');
+            });
+
+            socket.on('error', (error) => {
+                addLog('Error: ' + JSON.stringify(error), 'error');
+            });
+
+            socket.on('deviceData', (data) => {
+                addLog('📊 Device Data: ' + JSON.stringify(data), 'success');
+            });
+
+            socket.on('deviceStatus', (data) => {
+                addLog('📡 Device Status: ' + JSON.stringify(data), 'success');
+            });
+
+            socket.on('subscribed', (data) => {
+                addLog('Subscribed to: ' + JSON.stringify(data), 'success');
+            });
+
+            socket.on('unsubscribed', (data) => {
+                addLog('Unsubscribed from: ' + JSON.stringify(data));
+            });
+
+            socket.on('commandQueued', (data) => {
+                addLog('Command queued: ' + JSON.stringify(data), 'success');
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.close();
+                socket = null;
+                addLog('Disconnected');
+                updateStatus(false);
+            }
+        }
+
+        function subscribeToDevice() {
+            const deviceId = document.getElementById('deviceId').value;
+            
+            if (!socket) {
+                addLog('Please connect first', 'error');
+                return;
+            }
+
+            if (!deviceId) {
+                addLog('Please enter device ID', 'error');
+                return;
+            }
+
+            socket.emit('subscribeToDevice', { deviceId });
+            addLog('Subscribing to device: ' + deviceId);
+        }
+
+        function unsubscribeFromDevice() {
+            const deviceId = document.getElementById('deviceId').value;
+            
+            if (!socket) {
+                addLog('Please connect first', 'error');
+                return;
+            }
+
+            if (!deviceId) {
+                addLog('Please enter device ID', 'error');
+                return;
+            }
+
+            socket.emit('unsubscribeFromDevice', { deviceId });
+            addLog('Unsubscribing from device: ' + deviceId);
+        }
+
+        function sendCommand() {
+            const deviceId = document.getElementById('deviceId').value;
+            const command = document.getElementById('command').value;
+            const paramsText = document.getElementById('params').value;
+            
+            if (!socket) {
+                addLog('Please connect first', 'error');
+                return;
+            }
+
+            if (!deviceId || !command) {
+                addLog('Please enter device ID and command', 'error');
+                return;
+            }
+
+            let params = {};
+            if (paramsText) {
+                try {
+                    params = JSON.parse(paramsText);
+                } catch (error) {
+                    addLog('Invalid JSON in parameters', 'error');
+                    return;
+                }
+            }
+
+            socket.emit('sendCommand', { deviceId, command, params });
+            addLog('Sending command: ' + command + ' to device: ' + deviceId);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Auto-load token from localStorage if available
+        window.onload = () => {
+            const savedToken = localStorage.getItem('token');
+            if (savedToken) {
+                document.getElementById('token').value = savedToken;
+                addLog('Loaded token from localStorage');
+            }
+        };
+
+        // Save token when changed
+        document.getElementById('token').addEventListener('change', (e) => {
+            localStorage.setItem('token', e.target.value);
+        });
+    </script>
+</body>
+</html>

@@ -35,7 +35,14 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user.id);
 
-    return tokens;
+    return {
+      ...tokens,
+      token: tokens.accessToken,
+      user: {
+        id: user.id,
+        username: user.username,
+      },
+    };
   }
 
   async signIn(userDto: LoginUserDto) {
@@ -43,7 +50,14 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user.id);
 
-    return tokens;
+    return {
+      ...tokens,
+      token: tokens.accessToken,
+      user: {
+        id: user.id,
+        username: user.username,
+      },
+    };
   }
 
   async validateUser(userDto: LoginUserDto): Promise<User> {
