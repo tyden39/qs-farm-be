@@ -97,7 +97,7 @@ export class ProvisionService {
    */
   async pairDevice(userId: string, dto: PairDeviceDto) {
     try {
-      const { serial, farmId } = dto;
+      const { serial, farmId, pairingToken } = dto;
 
       this.logger.log(`Pairing device: ${serial} to farm: ${farmId} for user: ${userId}`);
 
@@ -117,6 +117,38 @@ export class ProvisionService {
         );
       }
 
+      // Verify pairing token
+      const pairingTokenRecord = await this.pairingTokenRepository.findOne({
+        where: { serial },
+      });
+
+      if (!pairingTokenRecord) {
+        throw new BadRequestException(
+          `No pairing token found for device: ${serial}. Device may not be provisioned yet.`,
+        );
+      }
+
+      // Check if token already used
+      if (pairingTokenRecord.used) {
+        throw new BadRequestException(
+          `Pairing token for device ${serial} has already been used.`,
+        );
+      }
+
+      // Check if token expired
+      if (new Date() > pairingTokenRecord.expiresAt) {
+        throw new BadRequestException(
+          `Pairing token for device ${serial} has expired. Please re-provision the device.`,
+        );
+      }
+
+      // Verify pairing token if provided
+      if (pairingToken && pairingTokenRecord.token !== pairingToken) {
+        throw new BadRequestException(
+          `Invalid pairing token for device: ${serial}`,
+        );
+      }
+
       // Verify farm belongs to user
       // TODO: Add farm ownership verification
 
@@ -133,7 +165,7 @@ export class ProvisionService {
 
       // Mark pairing token as used
       await this.pairingTokenRepository.update(
-        { serial },
+        pairingTokenRecord.id,
         { used: true },
       );
 
