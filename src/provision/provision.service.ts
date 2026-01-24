@@ -117,7 +117,7 @@ export class ProvisionService {
         );
       }
 
-      // Verify pairing token
+      // Verify pairing token (REQUIRED)
       const pairingTokenRecord = await this.pairingTokenRepository.findOne({
         where: { serial },
       });
@@ -142,8 +142,8 @@ export class ProvisionService {
         );
       }
 
-      // Verify pairing token if provided
-      if (pairingToken && pairingTokenRecord.token !== pairingToken) {
+      // Verify pairing token matches (REQUIRED)
+      if (pairingTokenRecord.token !== pairingToken) {
         throw new BadRequestException(
           `Invalid pairing token for device: ${serial}`,
         );
@@ -152,28 +152,16 @@ export class ProvisionService {
       // Verify farm belongs to user
       // TODO: Add farm ownership verification
 
-      // Generate device token for MQTT authentication (REQUIRED)
+      // Generate device token for MQTT authentication
       const deviceToken = this.generateDeviceToken();
-
-      if (!deviceToken || deviceToken.length === 0) {
-        throw new BadRequestException('Failed to generate device token');
-      }
 
       // Update device – only set farmId (not farm relation) to avoid "multiple assignments" error
       await this.deviceRepository.update(device.id, {
         farmId,
-        deviceToken, // REQUIRED for paired devices
+        deviceToken,
         status: DeviceStatus.PAIRED,
         pairedAt: new Date(),
       });
-
-      // Verify deviceToken was set correctly
-      const updatedDevice = await this.deviceRepository.findOne(device.id);
-      if (!updatedDevice?.deviceToken) {
-        throw new BadRequestException(
-          'Device token was not set correctly. Pairing failed.',
-        );
-      }
 
       // Mark pairing token as used
       await this.pairingTokenRepository.update(
@@ -200,7 +188,6 @@ export class ProvisionService {
 
   /**
    * Unpair device
-   * Note: deviceToken is cleared when unpairing (device goes back to PENDING)
    */
   async unpairDevice(deviceId: string) {
     const device = await this.deviceRepository.findOne(deviceId as any);
@@ -209,17 +196,15 @@ export class ProvisionService {
       throw new NotFoundException(`Device not found: ${deviceId}`);
     }
 
-    // Update device - clear farmId and deviceToken, set status to PENDING
-    await this.deviceRepository.update(deviceId, {
-      farmId: null,
-      deviceToken: null, // Clear token when unpairing
-      status: DeviceStatus.PENDING,
-    });
+    device.farmId = null;
+    device.deviceToken = null;
+    device.status = DeviceStatus.PENDING;
+
+    await this.deviceRepository.save(device);
 
     this.logger.log(`Device unpaired: ${deviceId}`);
 
-    // Return updated device
-    return this.deviceRepository.findOne(deviceId);
+    return device;
   }
 
   /**
@@ -238,22 +223,10 @@ export class ProvisionService {
       );
     }
 
-    // DeviceToken is required for paired/active devices
-    if (!device.deviceToken) {
-      throw new BadRequestException(
-        `Device ${deviceId} is missing deviceToken. Cannot regenerate.`,
-      );
-    }
-
     const newToken = this.generateDeviceToken();
+    device.deviceToken = newToken;
 
-    if (!newToken || newToken.length === 0) {
-      throw new BadRequestException('Failed to generate new device token');
-    }
-
-    await this.deviceRepository.update(deviceId, {
-      deviceToken: newToken,
-    });
+    await this.deviceRepository.save(device);
 
     this.logger.log(`Token regenerated for device: ${deviceId}`);
 
@@ -336,18 +309,12 @@ export class ProvisionService {
     farmId: string,
   ) {
     try {
-      // Use device/{deviceId}/cmd so device can subscribe immediately
-      // Device knows its own deviceId, but doesn't know farmId yet
       await this.mqttService.publishToTopic(
-        `device/${deviceId}/cmd`,
+        `farm/${farmId}/device/${deviceId}/cmd`,
         {
           cmd: 'set_owner',
           ownerId: userId,
-          farmId: farmId,
           token: deviceToken,
-          // Also provide topic patterns for future commands
-          commandTopic: `farm/${farmId}/device/${deviceId}/cmd`,
-          responseTopic: `farm/${farmId}/device/${deviceId}/resp`,
           timestamp: new Date().toISOString(),
         },
       );
