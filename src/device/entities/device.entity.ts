@@ -53,7 +53,7 @@ export class Device {
   @Column({ nullable: true })
   pairedAt: Date;
 
-  @Column('uuid')
+  @Column('uuid', { nullable: true })
   farmId: string;
 
   @ManyToOne(() => Farm, (farm: Farm) => farm.devices)
