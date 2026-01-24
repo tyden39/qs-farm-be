@@ -22,15 +22,26 @@ services:
       - "8084:8084"      # MQTT over WSS
       - "18083:18083"    # Dashboard
     environment:
+      # Erlang cookie for clustering
+      - EMQX_NODE__COOKIE=emqxsecretcookie
+      
+      # Dashboard credentials
+      - EMQX_DASHBOARD__DEFAULT_USERNAME=admin
+      - EMQX_DASHBOARD__DEFAULT_PASSWORD=public
+      
+      # MQTT Listeners
       - EMQX_LISTENERS__TCP__DEFAULT__ENABLED=true
       - EMQX_LISTENERS__TCP__DEFAULT__BIND=0.0.0.0:1883
       - EMQX_LISTENERS__WS__DEFAULT__ENABLED=true
       - EMQX_LISTENERS__WS__DEFAULT__BIND=0.0.0.0:8083
       - EMQX_LISTENERS__WSS__DEFAULT__ENABLED=false
-      - EMQX_DASHBOARD__DEFAULT__USERNAME=admin
-      - EMQX_DASHBOARD__DEFAULT__PASSWORD=public
-      - EMQX_AUTHENTICATION__1__ENABLE=true
-      - EMQX_AUTHENTICATION__1__TYPE=built_in_database
+      
+      # Built-in database authentication
+      - EMQX_AUTH_USER__PASSWORD_HASH_TYPE=sha256
+      
+      # HTTP API key (for external integrations)
+      - EMQX_API__KEY=your-api-key-change-this
+      - EMQX_API__SECRET_KEY=your-secret-key-change-this
     volumes:
       - emqx-data:/opt/emqx/data
       - emqx-log:/opt/emqx/log
