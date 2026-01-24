@@ -44,8 +44,8 @@ export class ProvisionService {
 
       // Check if device already exists
       let device = await this.deviceRepository.findOne({
-        serial,
-      } as any);
+        where: { serial },
+      });
 
       // If device exists and is already paired, reject
       if (device && device.status === DeviceStatus.ACTIVE) {
@@ -101,11 +101,9 @@ export class ProvisionService {
 
       this.logger.log(`Pairing device: ${serial} to farm: ${farmId} for user: ${userId}`);
 
-      // Find device by serial
+      // Find device by serial (no relations – avoid duplicate farmId assignment)
       const device = await this.deviceRepository.findOne({
-        serial,
-      } as any, {
-        relations: ['farm'],
+        where: { serial },
       });
 
       if (!device) {
@@ -125,13 +123,13 @@ export class ProvisionService {
       // Generate device token for MQTT authentication
       const deviceToken = this.generateDeviceToken();
 
-      // Update device
-      device.farmId = farmId;
-      device.deviceToken = deviceToken;
-      device.status = DeviceStatus.PAIRED;
-      device.pairedAt = new Date();
-
-      await this.deviceRepository.save(device);
+      // Update device – only set farmId (not farm relation) to avoid "multiple assignments" error
+      await this.deviceRepository.update(device.id, {
+        farmId,
+        deviceToken,
+        status: DeviceStatus.PAIRED,
+        pairedAt: new Date(),
+      });
 
       // Mark pairing token as used
       await this.pairingTokenRepository.update(
@@ -148,7 +146,7 @@ export class ProvisionService {
         deviceId: device.id,
         serial: device.serial,
         deviceToken,
-        status: device.status,
+        status: DeviceStatus.PAIRED,
       };
     } catch (error) {
       this.logger.error('Pair device error:', error);
@@ -211,8 +209,7 @@ export class ProvisionService {
    */
   async getPairingStatus(serial: string) {
     const device = await this.deviceRepository.findOne({
-      serial,
-    } as any, {
+      where: { serial },
       relations: ['farm'],
     });
 
