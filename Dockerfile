@@ -1,22 +1,15 @@
-FROM node:18-alpine
+FROM node:18-alpine AS builder
 
 WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-COPY yarn.lock ./
-
-# Install dependencies
-RUN yarn install --frozen-lockfile
-
-# Copy application code
+COPY package.json yarn.lock ./
+RUN yarn install
 COPY . .
-
-# Build the application
 RUN yarn build
 
-# Expose port
-EXPOSE 3000
+FROM node:18-alpine
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY package.json ./
 
-# Start the application
-CMD ["yarn", "start:prod"]
+CMD ["node", "dist/main.js"]
