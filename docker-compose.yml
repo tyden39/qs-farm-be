@@ -54,9 +54,6 @@ services:
     depends_on:
       - db
       - emqx
-    volumes:
-      - .:/app
-      - /app/node_modules
 
 volumes:
   emqx-data:
