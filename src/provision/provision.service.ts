@@ -323,10 +323,11 @@ export class ProvisionService {
   ) {
     try {
       await this.mqttService.publishToTopic(
-        `farm/${farmId}/device/${deviceId}/cmd`,
+        `device/${deviceId}/cmd`,
         {
           cmd: 'set_owner',
           ownerId: userId,
+          farmId: farmId,
           token: deviceToken,
           timestamp: new Date().toISOString(),
         },

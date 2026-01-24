@@ -35,26 +35,8 @@ export class EmqxService {
           where: [{ id: username }, { serial: username }],
         } as any);
 
-        if (!device) {
-          this.logger.warn(`Device not found: ${username}`);
-          return false;
-        }
-
-        // DeviceToken is REQUIRED for paired/active devices
-        if (
-          (device.status === DeviceStatus.PAIRED ||
-            device.status === DeviceStatus.ACTIVE) &&
-          !device.deviceToken
-        ) {
-          this.logger.error(
-            `Device ${username} is missing required deviceToken for status: ${device.status}`,
-          );
-          return false;
-        }
-
-        // For PENDING devices, token might not exist yet (allow during provisioning)
-        if (!device.deviceToken) {
-          this.logger.warn(`Device ${username} has no deviceToken`);
+        if (!device || !device.deviceToken) {
+          this.logger.warn(`Device auth failed for ${username}`);
           return false;
         }
 
@@ -115,7 +97,6 @@ export class EmqxService {
    * Check device topic permissions
    * Device can publish/subscribe to:
    * - device/{deviceId}/#
-   * - farm/{farmId}/device/{deviceId}/#
    */
   private async checkDeviceAcl(
     deviceId: string,
@@ -123,26 +104,18 @@ export class EmqxService {
     access: number,
   ): Promise<boolean> {
     const cleanDeviceId = deviceId.replace('device:', '');
-    const device = await this.deviceRepository.findOne(cleanDeviceId as any, {
-      relations: ['farm'],
-    });
+    const device = await this.deviceRepository.findOne(cleanDeviceId as any);
 
     if (!device || device.status === DeviceStatus.DISABLED) {
       return false;
     }
 
-    const farmId = device.farm?.id;
-
     // Allow device to access its own topics
     if (topic === `device/${cleanDeviceId}/status`) return true;
     if (topic === `device/${cleanDeviceId}/telemetry`) return true;
+    if (topic === `device/${cleanDeviceId}/cmd`) return true;
+    if (topic === `device/${cleanDeviceId}/resp`) return true;
     if (topic.startsWith(`device/${cleanDeviceId}/`)) return true;
-
-    // Allow device to receive commands and send responses for its farm
-    if (farmId) {
-      if (topic === `farm/${farmId}/device/${cleanDeviceId}/cmd`) return true;
-      if (topic === `farm/${farmId}/device/${cleanDeviceId}/resp`) return true;
-    }
 
     // Deny provisioning topics for paired devices
     if (device.status !== DeviceStatus.PENDING) {
@@ -168,40 +141,31 @@ export class EmqxService {
       return true;
     }
 
-    // Parse topic to extract farmId and deviceId
+    // Parse topic to extract deviceId
     const topicParts = topic.split('/');
 
-    // farm/{farmId}/device/{deviceId}/# pattern
-    if (topicParts[0] === 'farm' && topicParts.length >= 4) {
-      const farmId = topicParts[1];
+    // device/{deviceId}/# pattern
+    if (topicParts[0] === 'device' && topicParts.length >= 2) {
+      const deviceId = topicParts[1];
 
-      // Verify user owns this farm
-      const farm = await this.farmRepository.findOne({
-        where: { userId, id: farmId },
-      } as any);
+      // Find device and verify user owns the farm
+      const device = await this.deviceRepository.findOne(deviceId as any, {
+        relations: ['farm'],
+      });
 
-      if (farm) {
-        // Allow pub/sub for farm commands and responses
+      if (device && device.farm && device.farm.userId === userId) {
+        // Allow pub/sub for device commands, responses, status, telemetry
         if (
           topic.includes('cmd') ||
           topic.includes('resp') ||
-          topic.includes('status')
+          topic.includes('status') ||
+          topic.includes('telemetry')
         ) {
           return true;
         }
       }
 
       return false;
-    }
-
-    // Device telemetry subscription (can listen to any device telemetry)
-    if (topic.startsWith('device/') && topic.includes('/telemetry')) {
-      return true;
-    }
-
-    // Device status subscription (can listen to any device status)
-    if (topic.startsWith('device/') && topic.includes('/status')) {
-      return true;
     }
 
     return false;

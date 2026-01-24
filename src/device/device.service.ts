@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { Repository } from 'typeorm';
 
-import { Device, DeviceStatus } from './entities/device.entity';
+import { Device } from './entities/device.entity';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 
@@ -33,17 +33,6 @@ export class DeviceService {
       throw new NotFoundException(`There is no device under id ${id}`);
     }
 
-    // Validate deviceToken is required for paired/active devices
-    if (
-      (device.status === DeviceStatus.PAIRED ||
-        device.status === DeviceStatus.ACTIVE) &&
-      !device.deviceToken
-    ) {
-      throw new BadRequestException(
-        `Device ${id} is missing required deviceToken for status: ${device.status}`,
-      );
-    }
-
     return device;
   }
 
@@ -64,17 +53,6 @@ export class DeviceService {
 
     if (!device) {
       throw new NotFoundException(`There is no device under id ${id}`);
-    }
-
-    // Validate deviceToken is required for paired/active devices
-    if (
-      (device.status === DeviceStatus.PAIRED ||
-        device.status === DeviceStatus.ACTIVE) &&
-      !device.deviceToken
-    ) {
-      throw new BadRequestException(
-        `Device token is required for devices with status: ${device.status}`,
-      );
     }
 
     return this.deviceRepository.save(device);

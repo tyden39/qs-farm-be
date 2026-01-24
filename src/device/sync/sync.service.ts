@@ -41,7 +41,7 @@ export class SyncService implements OnModuleInit {
     });
 
     // Listen to device responses
-    this.mqttService.onMessage('farm/+/device/+/resp', (message: MqttMessage) => {
+    this.mqttService.onMessage('device/+/resp', (message: MqttMessage) => {
       this.handleDeviceResponse(message);
     });
 

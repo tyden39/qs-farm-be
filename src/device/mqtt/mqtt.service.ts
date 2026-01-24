@@ -83,11 +83,11 @@ export class MqttService implements OnModuleInit {
     });
 
     // Device responses
-    this.client.subscribe('farm/+/device/+/resp', (err) => {
+    this.client.subscribe('device/+/resp', (err) => {
       if (err) {
-        this.logger.error('Failed to subscribe to farm/+/device/+/resp', err);
+        this.logger.error('Failed to subscribe to device/+/resp', err);
       } else {
-        this.logger.log('Subscribed to farm/+/device/+/resp');
+        this.logger.log('Subscribed to device/+/resp');
       }
     });
   }
@@ -123,17 +123,11 @@ export class MqttService implements OnModuleInit {
   }
 
   private extractDeviceId(topic: string): string {
-    // Extract device ID from various topic formats
-    // device/{deviceId}/... -> {deviceId}
-    // farm/{farmId}/device/{deviceId}/... -> {deviceId}
+    // Extract device ID from topic format: device/{deviceId}/...
     const parts = topic.split('/');
 
     if (parts[0] === 'device') {
       return parts[1] || 'unknown';
-    }
-
-    if (parts[0] === 'farm' && parts[2] === 'device') {
-      return parts[3] || 'unknown';
     }
 
     return 'unknown';
@@ -180,7 +174,7 @@ export class MqttService implements OnModuleInit {
    * @param data - Command data
    */
   async publishToDevice(deviceId: string, command: string, data: any) {
-    const topic = `device/${deviceId}/command`;
+    const topic = `device/${deviceId}/cmd`;
     const payload = {
       command,
       data,
