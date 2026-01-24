@@ -5,7 +5,8 @@ import {
   ApiBody,
   ApiResponse,
 } from '@nestjs/swagger';
-import { ProvisionService, PairDeviceDto } from './provision.service';
+import { ProvisionService } from './provision.service';
+import { PairDeviceDto } from './dto/pair-device.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 
