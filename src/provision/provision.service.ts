@@ -5,14 +5,8 @@ import * as crypto from 'crypto';
 import { Device, DeviceStatus } from 'src/device/entities/device.entity';
 import { PairingToken } from 'src/device/entities/pairing-token.entity';
 import { MqttService } from 'src/device/mqtt/mqtt.service';
+import { ProvisionRequestDto } from './dto/provision-request.dto';
 import { PairDeviceDto } from './dto/pair-device.dto';
-
-export class ProvisionRequestDto {
-  serial: string;
-  hw?: string;
-  nonce?: string;
-  sig?: string;
-}
 
 @Injectable()
 export class ProvisionService {
