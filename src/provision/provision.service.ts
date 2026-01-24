@@ -152,16 +152,28 @@ export class ProvisionService {
       // Verify farm belongs to user
       // TODO: Add farm ownership verification
 
-      // Generate device token for MQTT authentication
+      // Generate device token for MQTT authentication (REQUIRED)
       const deviceToken = this.generateDeviceToken();
+
+      if (!deviceToken || deviceToken.length === 0) {
+        throw new BadRequestException('Failed to generate device token');
+      }
 
       // Update device – only set farmId (not farm relation) to avoid "multiple assignments" error
       await this.deviceRepository.update(device.id, {
         farmId,
-        deviceToken,
+        deviceToken, // REQUIRED for paired devices
         status: DeviceStatus.PAIRED,
         pairedAt: new Date(),
       });
+
+      // Verify deviceToken was set correctly
+      const updatedDevice = await this.deviceRepository.findOne(device.id);
+      if (!updatedDevice?.deviceToken) {
+        throw new BadRequestException(
+          'Device token was not set correctly. Pairing failed.',
+        );
+      }
 
       // Mark pairing token as used
       await this.pairingTokenRepository.update(
@@ -188,6 +200,7 @@ export class ProvisionService {
 
   /**
    * Unpair device
+   * Note: deviceToken is cleared when unpairing (device goes back to PENDING)
    */
   async unpairDevice(deviceId: string) {
     const device = await this.deviceRepository.findOne(deviceId as any);
@@ -196,15 +209,17 @@ export class ProvisionService {
       throw new NotFoundException(`Device not found: ${deviceId}`);
     }
 
-    device.farmId = null;
-    device.deviceToken = null;
-    device.status = DeviceStatus.PENDING;
-
-    await this.deviceRepository.save(device);
+    // Update device - clear farmId and deviceToken, set status to PENDING
+    await this.deviceRepository.update(deviceId, {
+      farmId: null,
+      deviceToken: null, // Clear token when unpairing
+      status: DeviceStatus.PENDING,
+    });
 
     this.logger.log(`Device unpaired: ${deviceId}`);
 
-    return device;
+    // Return updated device
+    return this.deviceRepository.findOne(deviceId);
   }
 
   /**
@@ -223,10 +238,22 @@ export class ProvisionService {
       );
     }
 
-    const newToken = this.generateDeviceToken();
-    device.deviceToken = newToken;
+    // DeviceToken is required for paired/active devices
+    if (!device.deviceToken) {
+      throw new BadRequestException(
+        `Device ${deviceId} is missing deviceToken. Cannot regenerate.`,
+      );
+    }
 
-    await this.deviceRepository.save(device);
+    const newToken = this.generateDeviceToken();
+
+    if (!newToken || newToken.length === 0) {
+      throw new BadRequestException('Failed to generate new device token');
+    }
+
+    await this.deviceRepository.update(deviceId, {
+      deviceToken: newToken,
+    });
 
     this.logger.log(`Token regenerated for device: ${deviceId}`);
 
@@ -309,12 +336,18 @@ export class ProvisionService {
     farmId: string,
   ) {
     try {
+      // Use device/{deviceId}/cmd so device can subscribe immediately
+      // Device knows its own deviceId, but doesn't know farmId yet
       await this.mqttService.publishToTopic(
-        `farm/${farmId}/device/${deviceId}/cmd`,
+        `device/${deviceId}/cmd`,
         {
           cmd: 'set_owner',
           ownerId: userId,
+          farmId: farmId,
           token: deviceToken,
+          // Also provide topic patterns for future commands
+          commandTopic: `farm/${farmId}/device/${deviceId}/cmd`,
+          responseTopic: `farm/${farmId}/device/${deviceId}/resp`,
           timestamp: new Date().toISOString(),
         },
       );

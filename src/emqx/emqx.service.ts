@@ -35,8 +35,26 @@ export class EmqxService {
           where: [{ id: username }, { serial: username }],
         } as any);
 
-        if (!device || !device.deviceToken) {
-          this.logger.warn(`Device auth failed for ${username}`);
+        if (!device) {
+          this.logger.warn(`Device not found: ${username}`);
+          return false;
+        }
+
+        // DeviceToken is REQUIRED for paired/active devices
+        if (
+          (device.status === DeviceStatus.PAIRED ||
+            device.status === DeviceStatus.ACTIVE) &&
+          !device.deviceToken
+        ) {
+          this.logger.error(
+            `Device ${username} is missing required deviceToken for status: ${device.status}`,
+          );
+          return false;
+        }
+
+        // For PENDING devices, token might not exist yet (allow during provisioning)
+        if (!device.deviceToken) {
+          this.logger.warn(`Device ${username} has no deviceToken`);
           return false;
         }
 
