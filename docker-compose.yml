@@ -45,7 +45,6 @@ services:
 
   nest-backend:
     build: .
-    dockerfile: Dockerfile
     image: my-nest-backend:latest
     restart: always
     env_file:
