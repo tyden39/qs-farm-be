@@ -26,13 +26,19 @@ export class ProvisionService {
    */
   async handleProvisionRequest(payload: ProvisionRequestDto) {
     try {
-      const { serial, hw } = payload;
+      const { serial, hw, nonce } = payload;
 
-      this.logger.log(`Provisioning request from serial: ${serial}, hw: ${hw}`);
+      this.logger.log(`Provisioning request from serial: ${serial}, hw: ${hw}, nonce: ${nonce}`);
 
       // Validate serial format
       if (!serial || serial.length === 0) {
         this.logger.warn('Provisioning failed: Invalid serial');
+        return null;
+      }
+
+      // Validate nonce (required for response topic)
+      if (!nonce || nonce.length === 0) {
+        this.logger.warn('Provisioning failed: Missing nonce');
         return null;
       }
 
@@ -77,8 +83,8 @@ export class ProvisionService {
 
       this.logger.log(`Device provisioned: ${serial} (${device.id})`);
 
-      // Publish provision response via MQTT
-      await this.publishProvisionResponse(device.id, pairingToken.token);
+      // Publish provision response via MQTT using nonce-based topic
+      await this.publishProvisionResponse(nonce, device.id, pairingToken.token);
 
       return {
         deviceId: device.id,
@@ -284,19 +290,26 @@ export class ProvisionService {
     return hw.length > 0 && hw.length <= 50;
   }
 
-  private async publishProvisionResponse(deviceId: string, token: string) {
+  private async publishProvisionResponse(
+    nonce: string,
+    deviceId: string,
+    pairingToken: string,
+  ) {
     try {
       await this.mqttService.publishToTopic(
-        `device/${deviceId}/provision/resp`,
+        `provision/resp/${nonce}`,
         {
           status: 'provisioned',
-          token,
+          deviceId: deviceId,
+          pairingToken: pairingToken,
           message: 'Device provisioned. Ready for pairing.',
           timestamp: new Date().toISOString(),
         },
       );
 
-      this.logger.debug(`Published provision response for ${deviceId}`);
+      this.logger.debug(
+        `Published provision response to provision/resp/${nonce} for device ${deviceId}`,
+      );
     } catch (error) {
       this.logger.warn(`Failed to publish provision response: ${error.message}`);
     }
