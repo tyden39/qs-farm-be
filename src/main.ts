@@ -32,6 +32,7 @@ async function bootstrap() {
     .setTitle('Farm Management API')
     .setDescription('Farm and Device Management API')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, options);
   SwaggerModule.setup('api', app, document);
