@@ -112,6 +112,7 @@ export class AuthController {
       user.id,
       changePasswordDto.currentPassword,
       changePasswordDto.newPassword,
+      changePasswordDto.confirmPassword,
     );
   }
 }

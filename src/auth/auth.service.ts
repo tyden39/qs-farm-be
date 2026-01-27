@@ -182,13 +182,17 @@ export class AuthService {
     return { resetToken };
   }
 
-  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+  async changePassword(userId: string, currentPassword: string, newPassword: string, confirmPassword: string) {
     const user = await this.userService.findOne(userId);
 
     const passwordEquals = await bcrypt.compare(currentPassword, user.password);
 
     if (!passwordEquals) {
       throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    if (newPassword !== confirmPassword) {
+      throw new BadRequestException('New password and confirm password do not match');
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 7);
