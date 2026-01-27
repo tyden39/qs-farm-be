@@ -10,6 +10,7 @@ import { MqttService } from './mqtt/mqtt.service';
 import { DeviceGateway } from './websocket/device.gateway';
 import { SyncService } from './sync/sync.service';
 import { ProvisionModule } from 'src/provision/provision.module';
+import { UserModule } from 'src/user/user.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ProvisionModule } from 'src/provision/provision.module';
       signOptions: { expiresIn: process.env.JWT_ACCESS_EXPIRE },
     }),
     ProvisionModule,
+    UserModule,
   ],
   controllers: [DeviceController],
   providers: [DeviceService, MqttService, DeviceGateway, SyncService],

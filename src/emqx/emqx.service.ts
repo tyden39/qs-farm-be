@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Device, DeviceStatus } from 'src/device/entities/device.entity';
 import { Farm } from 'src/farm/entities/farm.entity';
+import { UserService } from 'src/user/user.service';
 import { EmqxAuthDto } from './dto/emqx-auth.dto';
 import { EmqxAclDto } from './dto/emqx-acl.dto';
 
@@ -17,6 +18,7 @@ export class EmqxService {
     @InjectRepository(Farm)
     private readonly farmRepository: Repository<Farm>,
     private readonly jwtService: JwtService,
+    private readonly userService: UserService,
   ) {}
 
   /**
@@ -57,6 +59,13 @@ export class EmqxService {
         });
 
         if (payload && payload.id === username) {
+          const user = await this.userService.findOne(payload.id);
+
+          if (user.tokenVersion !== payload.tokenVersion) {
+            this.logger.warn(`Token revoked for user ${username}`);
+            return false;
+          }
+
           this.logger.log(`User authenticated: ${username}`);
           return true;
         }

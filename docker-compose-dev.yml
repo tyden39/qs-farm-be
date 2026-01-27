@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:14
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  emqx:
+    image: emqx/emqx:5.4.0
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "1883:1883"
+      - "8083:8083"
+      - "8084:8084"
+      - "18083:18083"
+    environment:
+      - EMQX_NODE__COOKIE=${EMQX_NODE__COOKIE}
+      - EMQX_DASHBOARD__DEFAULT_USERNAME=${EMQX_DASHBOARD__DEFAULT_USERNAME}
+      - EMQX_DASHBOARD__DEFAULT_PASSWORD=${EMQX_DASHBOARD__DEFAULT_PASSWORD}
+      - EMQX_LISTENERS__TCP__DEFAULT__ENABLED=${EMQX_LISTENERS__TCP__DEFAULT__ENABLED}
+      - EMQX_LISTENERS__TCP__DEFAULT__BIND=${EMQX_LISTENERS__TCP__DEFAULT__BIND}
+      - EMQX_LISTENERS__WS__DEFAULT__ENABLED=${EMQX_LISTENERS__WS__DEFAULT__ENABLED}
+      - EMQX_LISTENERS__WS__DEFAULT__BIND=${EMQX_LISTENERS__WS__DEFAULT__BIND}
+      - EMQX_LISTENERS__WSS__DEFAULT__ENABLED=${EMQX_LISTENERS__WSS__DEFAULT__ENABLED}
+      - EMQX_AUTH_USER__PASSWORD_HASH_TYPE=${EMQX_AUTH_USER__PASSWORD_HASH_TYPE}
+    volumes:
+      - emqx-data:/opt/emqx/data
+      - emqx-log:/opt/emqx/log
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx", "ctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nest-backend:
+    build: .
+    image: my-nest-backend:latest
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "3040:3000"
+    depends_on:
+      - db
+      - emqx
+
+volumes:
+  emqx-data:
+  emqx-log:

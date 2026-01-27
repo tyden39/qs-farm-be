@@ -10,6 +10,7 @@ import {
 import { Logger, UseGuards } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
+import { UserService } from 'src/user/user.service';
 
 @WebSocketGateway({
   cors: {
@@ -25,12 +26,15 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(DeviceGateway.name);
   private connectedClients: Map<string, string> = new Map(); // socketId -> userId
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly userService: UserService,
+  ) {}
 
   async handleConnection(client: Socket) {
     try {
       const token = client.handshake.auth.token || client.handshake.headers.authorization?.replace('Bearer ', '');
-      
+
       if (!token) {
         this.logger.warn(`Client ${client.id} connected without token`);
         client.disconnect();
@@ -40,6 +44,15 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const payload = this.jwtService.verify(token, {
         secret: process.env.JWT_ACCESS_SECRET,
       });
+
+      const user = await this.userService.findOne(payload.id);
+
+      if (user.tokenVersion !== payload.tokenVersion) {
+        this.logger.warn(`Client ${client.id} token revoked`);
+        client.emit('error', { message: 'Token has been revoked' });
+        client.disconnect();
+        return;
+      }
 
       this.connectedClients.set(client.id, payload.id);
       client.data.userId = payload.id;

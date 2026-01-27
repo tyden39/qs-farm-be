@@ -24,6 +24,9 @@ export class User {
   @Column({ type: 'boolean', default: false })
   is_admin: boolean;
 
+  @Column({ type: 'int', default: 0 })
+  tokenVersion: number;
+
   @OneToMany(() => Farm, (farm: Farm) => farm.user)
   farms: Array<Farm>;
 }
