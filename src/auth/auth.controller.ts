@@ -22,6 +22,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('auth')
@@ -66,9 +67,9 @@ export class AuthController {
     return tokens;
   }
 
-  @Post('/update')
-  async updateTokens(@Req() req: Request) {
-    const { refreshToken } = req.cookies;
+  @Post('/refresh-token')
+  async updateTokens(@Req() req: Request, @Body() refreshTokenDto: RefreshTokenDto) {
+    const refreshToken = req.cookies.refreshToken || refreshTokenDto.refreshToken;
 
     const accessToken = await this.authService.updateAccessToken(refreshToken);
 
