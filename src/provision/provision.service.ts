@@ -265,6 +265,101 @@ export class ProvisionService {
     };
   }
 
+  /**
+   * Get all pairing tokens
+   */
+  async getAllPairingTokens() {
+    const tokens = await this.pairingTokenRepository.find({
+      order: { createdAt: 'DESC' },
+    });
+
+    const now = new Date();
+
+    return tokens.map(token => ({
+      id: token.id,
+      serial: token.serial,
+      token: token.token,
+      used: token.used,
+      expired: now > token.expiresAt,
+      expiresAt: token.expiresAt,
+      createdAt: token.createdAt,
+    }));
+  }
+
+  /**
+   * Delete a single pairing token
+   */
+  async deletePairingToken(tokenId: string) {
+    const token = await this.pairingTokenRepository.findOne({
+      where: { id: tokenId },
+    });
+
+    if (!token) {
+      throw new NotFoundException(`Pairing token not found: ${tokenId}`);
+    }
+
+    await this.pairingTokenRepository.delete(tokenId);
+
+    this.logger.log(`Pairing token deleted: ${tokenId} (serial: ${token.serial})`);
+
+    return {
+      message: 'Pairing token deleted successfully',
+      tokenId: tokenId,
+      serial: token.serial,
+    };
+  }
+
+  /**
+   * Delete all pairing tokens (or filtered by status)
+   */
+  async deleteAllPairingTokens(filter?: 'expired' | 'used' | 'all') {
+    const now = new Date();
+    let tokensToDelete: PairingToken[] = [];
+
+    switch (filter) {
+      case 'expired':
+        // Delete only expired tokens
+        tokensToDelete = await this.pairingTokenRepository
+          .createQueryBuilder('token')
+          .where('token.expiresAt < :now', { now })
+          .getMany();
+        break;
+
+      case 'used':
+        // Delete only used tokens
+        tokensToDelete = await this.pairingTokenRepository.find({
+          where: { used: true },
+        });
+        break;
+
+      case 'all':
+      default:
+        // Delete all tokens
+        tokensToDelete = await this.pairingTokenRepository.find();
+        break;
+    }
+
+    if (tokensToDelete.length === 0) {
+      return {
+        message: 'No pairing tokens to delete',
+        deletedCount: 0,
+      };
+    }
+
+    // Delete tokens
+    await this.pairingTokenRepository.remove(tokensToDelete);
+
+    this.logger.log(
+      `Deleted ${tokensToDelete.length} pairing tokens (filter: ${filter || 'all'})`,
+    );
+
+    return {
+      message: `${tokensToDelete.length} pairing token(s) deleted successfully`,
+      deletedCount: tokensToDelete.length,
+      filter: filter || 'all',
+    };
+  }
+
   // Private helper methods
 
   private async generatePairingToken(serial: string): Promise<PairingToken> {

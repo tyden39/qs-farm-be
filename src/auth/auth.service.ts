@@ -116,7 +116,7 @@ export class AuthService {
 
       const tokens = await this.generateTokens(user.id, user.tokenVersion);
 
-      return tokens.accessToken;
+      return tokens;
     } catch (e) {
       return null;
     }
