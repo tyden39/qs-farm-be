@@ -83,7 +83,13 @@ export class UserService {
     const uploadedFile = await this.filesService.create(file);
 
     user.avatar = uploadedFile.file.path;
-    
+
     return this.userRepository.save(user);
+  }
+
+  async removeAll() {
+    const users = await this.userRepository.find();
+
+    return this.userRepository.remove(users);
   }
 }
