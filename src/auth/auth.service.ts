@@ -28,11 +28,21 @@ export class AuthService {
   ) {}
 
   async singUp(userDto: CreateUserDto) {
-    const candidate = await this.userService.findOneByUsername(
+    const existingUsername = await this.userService.findOneByUsername(
       userDto.username,
     );
 
-    if (candidate) return null;
+    if (existingUsername) {
+      throw new BadRequestException('User with this username already exists');
+    }
+
+    const existingEmail = await this.userService.findOneByEmail(
+      userDto.email,
+    );
+
+    if (existingEmail) {
+      throw new BadRequestException('User with this email already exists');
+    }
 
     const hashedPassword = await bcrypt.hash(userDto.password, 7);
     const user = await this.userService.create({
@@ -48,6 +58,7 @@ export class AuthService {
       user: {
         id: user.id,
         username: user.username,
+        email: user.email,
       },
     };
   }

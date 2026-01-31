@@ -18,6 +18,12 @@ export class User {
   @Column({ length: 60 })
   password: string;
 
+  @Column({ unique: true })
+  email: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  phone: string;
+
   @Column({ type: 'varchar', default: '', nullable: true })
   avatar: string;
 

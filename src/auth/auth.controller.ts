@@ -36,13 +36,6 @@ export class AuthController {
   ) {
     const tokens = await this.authService.singUp(userDto);
 
-    if (!tokens) {
-      throw new HttpException(
-        'User under this username already exists',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
       maxAge: 30 * 24 * 60 * 60 * 1000,
