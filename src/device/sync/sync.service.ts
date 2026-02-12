@@ -147,6 +147,13 @@ export class SyncService implements OnModuleInit {
         timestamp: new Date().toISOString(),
       });
 
+      this.eventEmitter.emit('command.dispatched', {
+        deviceId,
+        command,
+        params,
+        success: true,
+      });
+
       return {
         success: true,
         message: 'Command sent to device',
@@ -160,6 +167,14 @@ export class SyncService implements OnModuleInit {
         command,
         error: error.message,
         timestamp: new Date().toISOString(),
+      });
+
+      this.eventEmitter.emit('command.dispatched', {
+        deviceId,
+        command,
+        params,
+        success: false,
+        errorMessage: error.message,
       });
 
       throw error;

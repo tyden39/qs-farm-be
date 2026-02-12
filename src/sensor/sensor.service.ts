@@ -3,10 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
 
+import { Device } from 'src/device/entities/device.entity';
 import { SensorConfig } from './entities/sensor-config.entity';
 import { SensorThreshold } from './entities/sensor-threshold.entity';
 import { SensorData } from './entities/sensor-data.entity';
 import { AlertLog } from './entities/alert-log.entity';
+import { CommandLog, CommandSource } from './entities/command-log.entity';
 import { PAYLOAD_TO_SENSOR_TYPE } from './enums/sensor-type.enum';
 import { SensorMode } from './enums/sensor-mode.enum';
 import { CreateSensorConfigDto } from './dto/create-sensor-config.dto';
@@ -15,12 +17,24 @@ import { CreateSensorThresholdDto } from './dto/create-sensor-threshold.dto';
 import { UpdateSensorThresholdDto } from './dto/update-sensor-threshold.dto';
 import { QuerySensorDataDto } from './dto/query-sensor-data.dto';
 import { QueryAlertLogDto } from './dto/query-alert-log.dto';
+import { QuerySensorStatsDto } from './dto/query-sensor-stats.dto';
+import { QueryAlertSummaryDto } from './dto/query-alert-summary.dto';
+import { QueryCommandLogDto } from './dto/query-command-log.dto';
+import { QueryFarmComparisonDto } from './dto/query-farm-comparison.dto';
 import { ThresholdService } from './threshold.service';
 
 interface TelemetryEvent {
   deviceId: string;
   payload: any;
   timestamp: Date;
+}
+
+interface CommandDispatchedEvent {
+  deviceId: string;
+  command: string;
+  params: any;
+  success: boolean;
+  errorMessage?: string;
 }
 
 @Injectable()
@@ -42,6 +56,10 @@ export class SensorService {
     private readonly sensorDataRepo: Repository<SensorData>,
     @InjectRepository(AlertLog)
     private readonly alertLogRepo: Repository<AlertLog>,
+    @InjectRepository(CommandLog)
+    private readonly commandLogRepo: Repository<CommandLog>,
+    @InjectRepository(Device)
+    private readonly deviceRepo: Repository<Device>,
     private readonly thresholdService: ThresholdService,
   ) {}
 
@@ -287,5 +305,222 @@ export class SensorService {
     if (!alert) throw new NotFoundException('Alert not found');
     alert.acknowledged = true;
     return this.alertLogRepo.save(alert);
+  }
+
+  // --- Command Log (manual commands via event) ---
+
+  @OnEvent('command.dispatched')
+  async handleCommandDispatched(event: CommandDispatchedEvent) {
+    try {
+      await this.commandLogRepo.save(
+        this.commandLogRepo.create({
+          deviceId: event.deviceId,
+          command: event.command,
+          params: event.params,
+          source: CommandSource.MANUAL,
+          success: event.success,
+          errorMessage: event.errorMessage,
+        }),
+      );
+    } catch (error) {
+      this.logger.error('Failed to log manual command:', error);
+    }
+  }
+
+  // --- Stats & Reports ---
+
+  async getDeviceStats(deviceId: string, query: QuerySensorStatsDto) {
+    const qb = this.sensorDataRepo
+      .createQueryBuilder('sd')
+      .select('MIN(sd.value)', 'min')
+      .addSelect('MAX(sd.value)', 'max')
+      .addSelect('AVG(sd.value)', 'avg')
+      .addSelect('COUNT(*)', 'count')
+      .where('sd.deviceId = :deviceId', { deviceId })
+      .andWhere('sd.sensorType = :sensorType', {
+        sensorType: query.sensorType,
+      });
+
+    if (query.from) {
+      qb.andWhere('sd.createdAt >= :from', { from: query.from });
+    }
+    if (query.to) {
+      qb.andWhere('sd.createdAt <= :to', { to: query.to });
+    }
+
+    return qb.getRawOne();
+  }
+
+  async getDeviceTimeseries(deviceId: string, query: QuerySensorStatsDto) {
+    const bucket = query.bucket || 'hour';
+
+    const qb = this.sensorDataRepo
+      .createQueryBuilder('sd')
+      .select(`DATE_TRUNC(:bucket, sd.createdAt)`, 'bucket')
+      .addSelect('MIN(sd.value)', 'min')
+      .addSelect('MAX(sd.value)', 'max')
+      .addSelect('AVG(sd.value)', 'avg')
+      .addSelect('COUNT(*)', 'count')
+      .where('sd.deviceId = :deviceId', { deviceId })
+      .andWhere('sd.sensorType = :sensorType', {
+        sensorType: query.sensorType,
+      })
+      .setParameter('bucket', bucket)
+      .groupBy('bucket')
+      .orderBy('bucket', 'ASC');
+
+    if (query.from) {
+      qb.andWhere('sd.createdAt >= :from', { from: query.from });
+    }
+    if (query.to) {
+      qb.andWhere('sd.createdAt <= :to', { to: query.to });
+    }
+
+    return qb.getRawMany();
+  }
+
+  async getAlertSummary(deviceId: string, query: QueryAlertSummaryDto) {
+    const qb = this.alertLogRepo
+      .createQueryBuilder('al')
+      .select('al.level', 'level')
+      .addSelect('al.sensorType', 'sensorType')
+      .addSelect('al.acknowledged', 'acknowledged')
+      .addSelect('COUNT(*)', 'count')
+      .where('al.deviceId = :deviceId', { deviceId })
+      .groupBy('al.level')
+      .addGroupBy('al.sensorType')
+      .addGroupBy('al.acknowledged');
+
+    if (query.from) {
+      qb.andWhere('al.createdAt >= :from', { from: query.from });
+    }
+    if (query.to) {
+      qb.andWhere('al.createdAt <= :to', { to: query.to });
+    }
+
+    return qb.getRawMany();
+  }
+
+  async getCommandLog(deviceId: string, query: QueryCommandLogDto) {
+    const qb = this.commandLogRepo
+      .createQueryBuilder('cl')
+      .where('cl.deviceId = :deviceId', { deviceId })
+      .orderBy('cl.createdAt', 'DESC');
+
+    if (query.source) {
+      qb.andWhere('cl.source = :source', { source: query.source });
+    }
+    if (query.from) {
+      qb.andWhere('cl.createdAt >= :from', { from: query.from });
+    }
+    if (query.to) {
+      qb.andWhere('cl.createdAt <= :to', { to: query.to });
+    }
+
+    const limit = query.limit ? parseInt(query.limit, 10) : 50;
+    qb.take(limit);
+
+    return qb.getMany();
+  }
+
+  // --- Farm-Level Reports ---
+
+  async getFarmDashboard(farmId: string) {
+    const devices = await this.deviceRepo.find({ where: { farmId } });
+
+    const result = await Promise.all(
+      devices.map(async (device) => {
+        const latestReadings = await this.findLatestSensorData(device.id);
+        return {
+          deviceId: device.id,
+          name: device.name,
+          status: device.status,
+          latestReadings,
+        };
+      }),
+    );
+
+    return result;
+  }
+
+  async getFarmAlertOverview(farmId: string, query: QueryAlertSummaryDto) {
+    const qb = this.alertLogRepo
+      .createQueryBuilder('al')
+      .innerJoin(Device, 'd', 'd.id = al.deviceId')
+      .select('al.deviceId', 'deviceId')
+      .addSelect('d.name', 'deviceName')
+      .addSelect('al.level', 'level')
+      .addSelect('COUNT(*)', 'count')
+      .where('d.farmId = :farmId', { farmId })
+      .groupBy('al.deviceId')
+      .addGroupBy('d.name')
+      .addGroupBy('al.level');
+
+    if (query.from) {
+      qb.andWhere('al.createdAt >= :from', { from: query.from });
+    }
+    if (query.to) {
+      qb.andWhere('al.createdAt <= :to', { to: query.to });
+    }
+
+    return qb.getRawMany();
+  }
+
+  async getFarmComparison(farmId: string, query: QueryFarmComparisonDto) {
+    const qb = this.sensorDataRepo
+      .createQueryBuilder('sd')
+      .innerJoin(Device, 'd', 'd.id = sd.deviceId')
+      .select('sd.deviceId', 'deviceId')
+      .addSelect('d.name', 'deviceName')
+      .addSelect('MIN(sd.value)', 'min')
+      .addSelect('MAX(sd.value)', 'max')
+      .addSelect('AVG(sd.value)', 'avg')
+      .addSelect('COUNT(*)', 'count')
+      .where('d.farmId = :farmId', { farmId })
+      .andWhere('sd.sensorType = :sensorType', {
+        sensorType: query.sensorType,
+      })
+      .groupBy('sd.deviceId')
+      .addGroupBy('d.name');
+
+    if (query.from) {
+      qb.andWhere('sd.createdAt >= :from', { from: query.from });
+    }
+    if (query.to) {
+      qb.andWhere('sd.createdAt <= :to', { to: query.to });
+    }
+
+    return qb.getRawMany();
+  }
+
+  // --- System-Level Reports ---
+
+  async getSystemOverview() {
+    const [devicesByStatus, alertsByLevel, activeDeviceCount] =
+      await Promise.all([
+        this.deviceRepo
+          .createQueryBuilder('d')
+          .select('d.status', 'status')
+          .addSelect('COUNT(*)', 'count')
+          .groupBy('d.status')
+          .getRawMany(),
+        this.alertLogRepo
+          .createQueryBuilder('al')
+          .select('al.level', 'level')
+          .addSelect('COUNT(*)', 'count')
+          .groupBy('al.level')
+          .getRawMany(),
+        this.sensorDataRepo
+          .createQueryBuilder('sd')
+          .select('COUNT(DISTINCT sd.deviceId)', 'count')
+          .where("sd.createdAt >= NOW() - INTERVAL '24 hours'")
+          .getRawOne(),
+      ]);
+
+    return {
+      devicesByStatus,
+      alertsByLevel,
+      activeDevicesLast24h: activeDeviceCount?.count || '0',
+    };
   }
 }

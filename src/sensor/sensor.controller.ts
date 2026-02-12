@@ -18,6 +18,10 @@ import { CreateSensorThresholdDto } from './dto/create-sensor-threshold.dto';
 import { UpdateSensorThresholdDto } from './dto/update-sensor-threshold.dto';
 import { QuerySensorDataDto } from './dto/query-sensor-data.dto';
 import { QueryAlertLogDto } from './dto/query-alert-log.dto';
+import { QuerySensorStatsDto } from './dto/query-sensor-stats.dto';
+import { QueryAlertSummaryDto } from './dto/query-alert-summary.dto';
+import { QueryCommandLogDto } from './dto/query-command-log.dto';
+import { QueryFarmComparisonDto } from './dto/query-farm-comparison.dto';
 
 @ApiTags('Sensors')
 @ApiBearerAuth()
@@ -105,6 +109,24 @@ export class SensorController {
     return this.sensorService.findLatestSensorData(deviceId);
   }
 
+  // --- Device Stats & Reports ---
+
+  @Get('device/:deviceId/stats')
+  getDeviceStats(
+    @Param('deviceId') deviceId: string,
+    @Query() query: QuerySensorStatsDto,
+  ) {
+    return this.sensorService.getDeviceStats(deviceId, query);
+  }
+
+  @Get('device/:deviceId/stats/timeseries')
+  getDeviceTimeseries(
+    @Param('deviceId') deviceId: string,
+    @Query() query: QuerySensorStatsDto,
+  ) {
+    return this.sensorService.getDeviceTimeseries(deviceId, query);
+  }
+
   // --- Alerts ---
 
   @Get('device/:deviceId/alerts')
@@ -115,11 +137,59 @@ export class SensorController {
     return this.sensorService.findAlerts(deviceId, query);
   }
 
+  @Get('device/:deviceId/alerts/summary')
+  getAlertSummary(
+    @Param('deviceId') deviceId: string,
+    @Query() query: QueryAlertSummaryDto,
+  ) {
+    return this.sensorService.getAlertSummary(deviceId, query);
+  }
+
   @Patch('device/:deviceId/alerts/:id/acknowledge')
   acknowledgeAlert(
     @Param('deviceId') deviceId: string,
     @Param('id') id: string,
   ) {
     return this.sensorService.acknowledgeAlert(deviceId, id);
+  }
+
+  // --- Command History ---
+
+  @Get('device/:deviceId/commands')
+  getCommandLog(
+    @Param('deviceId') deviceId: string,
+    @Query() query: QueryCommandLogDto,
+  ) {
+    return this.sensorService.getCommandLog(deviceId, query);
+  }
+
+  // --- Farm-Level Reports ---
+
+  @Get('farm/:farmId/dashboard')
+  getFarmDashboard(@Param('farmId') farmId: string) {
+    return this.sensorService.getFarmDashboard(farmId);
+  }
+
+  @Get('farm/:farmId/alerts/overview')
+  getFarmAlertOverview(
+    @Param('farmId') farmId: string,
+    @Query() query: QueryAlertSummaryDto,
+  ) {
+    return this.sensorService.getFarmAlertOverview(farmId, query);
+  }
+
+  @Get('farm/:farmId/comparison')
+  getFarmComparison(
+    @Param('farmId') farmId: string,
+    @Query() query: QueryFarmComparisonDto,
+  ) {
+    return this.sensorService.getFarmComparison(farmId, query);
+  }
+
+  // --- System-Level Reports ---
+
+  @Get('system/overview')
+  getSystemOverview() {
+    return this.sensorService.getSystemOverview();
   }
 }

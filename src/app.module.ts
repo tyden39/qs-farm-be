@@ -13,6 +13,7 @@ import { FilesModule } from './files/files.module';
 import { EmqxModule } from './emqx/emqx.module';
 import { ProvisionModule } from './provision/provision.module';
 import { SensorModule } from './sensor/sensor.module';
+import { ScheduleModule } from './schedule/schedule.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { SensorModule } from './sensor/sensor.module';
     EmqxModule,
     ProvisionModule,
     SensorModule,
+    ScheduleModule,
   ],
   providers: [],
 })

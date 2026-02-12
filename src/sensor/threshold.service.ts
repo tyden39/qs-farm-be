@@ -6,6 +6,7 @@ import { MqttService } from 'src/device/mqtt/mqtt.service';
 import { DeviceGateway } from 'src/device/websocket/device.gateway';
 import { SensorConfig } from './entities/sensor-config.entity';
 import { AlertLog, AlertDirection } from './entities/alert-log.entity';
+import { CommandLog, CommandSource } from './entities/command-log.entity';
 import { ThresholdLevel } from './enums/threshold-level.enum';
 import { SENSOR_REASON_MAP } from './constants/threshold-rules';
 
@@ -27,6 +28,8 @@ export class ThresholdService {
     private readonly deviceGateway: DeviceGateway,
     @InjectRepository(AlertLog)
     private readonly alertLogRepo: Repository<AlertLog>,
+    @InjectRepository(CommandLog)
+    private readonly commandLogRepo: Repository<CommandLog>,
   ) {}
 
   async evaluate(
@@ -103,11 +106,36 @@ export class ThresholdService {
             threshold: thresholdValue,
             reason,
           });
+
+          await this.commandLogRepo.save(
+            this.commandLogRepo.create({
+              deviceId,
+              command: threshold.action,
+              params: { reason, sensorType, level: threshold.level, value, threshold: thresholdValue },
+              source: CommandSource.AUTOMATED,
+              sensorType,
+              reason,
+              success: true,
+            }),
+          );
         } catch (error) {
           this.logger.error(
             `Failed to dispatch command ${threshold.action} to ${deviceId}:`,
             error,
           );
+
+          await this.commandLogRepo.save(
+            this.commandLogRepo.create({
+              deviceId,
+              command: threshold.action,
+              params: { reason, sensorType, level: threshold.level, value, threshold: thresholdValue },
+              source: CommandSource.AUTOMATED,
+              sensorType,
+              reason,
+              success: false,
+              errorMessage: error.message,
+            }),
+          ).catch((e) => this.logger.error('Failed to log command:', e));
         }
       }
 
