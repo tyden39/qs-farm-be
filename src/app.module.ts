@@ -1,6 +1,7 @@
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Module } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { join } from 'path';
 
 import { UserModule } from './user/user.module';
@@ -11,6 +12,7 @@ import { DeviceModule } from './device/device.module';
 import { FilesModule } from './files/files.module';
 import { EmqxModule } from './emqx/emqx.module';
 import { ProvisionModule } from './provision/provision.module';
+import { SensorModule } from './sensor/sensor.module';
 
 @Module({
   imports: [
@@ -18,6 +20,7 @@ import { ProvisionModule } from './provision/provision.module';
       rootPath: join(__dirname, '..', 'public'),
     }),
     ConfigModule.forRoot(),
+    EventEmitterModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST,
@@ -35,6 +38,7 @@ import { ProvisionModule } from './provision/provision.module';
     FilesModule,
     EmqxModule,
     ProvisionModule,
+    SensorModule,
   ],
   providers: [],
 })

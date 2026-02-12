@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttService, MqttMessage } from '../mqtt/mqtt.service';
 import { DeviceGateway } from '../websocket/device.gateway';
 import { ProvisionService } from 'src/provision/provision.service';
@@ -14,6 +15,7 @@ export class SyncService implements OnModuleInit {
     private readonly mqttService: MqttService,
     private readonly deviceGateway: DeviceGateway,
     private readonly provisionService: ProvisionService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   onModuleInit() {
@@ -105,6 +107,12 @@ export class SyncService implements OnModuleInit {
       type: 'telemetry',
       ...payload,
       receivedAt: timestamp,
+    });
+
+    this.eventEmitter.emit('telemetry.received', {
+      deviceId,
+      payload,
+      timestamp,
     });
   }
 

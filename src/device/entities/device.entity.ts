@@ -3,12 +3,14 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
 import { Farm } from 'src/farm/entities/farm.entity';
+import { SensorConfig } from 'src/sensor/entities/sensor-config.entity';
 
 export enum DeviceStatus {
   PENDING = 'pending',
@@ -59,6 +61,9 @@ export class Device {
   @ManyToOne(() => Farm, (farm: Farm) => farm.devices)
   @JoinColumn({ name: 'farmId' })
   farm: Farm;
+
+  @OneToMany(() => SensorConfig, (sc) => sc.device)
+  sensorConfigs: SensorConfig[];
 
   @CreateDateColumn()
   createdAt: Date;
