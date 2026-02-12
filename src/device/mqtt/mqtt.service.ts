@@ -106,11 +106,16 @@ export class MqttService implements OnModuleInit {
 
       this.logger.debug(`Received MQTT message from ${deviceId}:`, payload);
 
-      // Trigger all registered callbacks for this topic
-      const callbacks = this.messageCallbacks.get(topic) || [];
-      const wildcardCallbacks = this.messageCallbacks.get('*') || [];
+      // Collect matching callbacks (exact match + wildcard pattern match + global '*')
+      const matchedCallbacks: Function[] = [];
 
-      [...callbacks, ...wildcardCallbacks].forEach((callback) => {
+      for (const [pattern, callbacks] of this.messageCallbacks.entries()) {
+        if (pattern === '*' || this.topicMatchesPattern(topic, pattern)) {
+          matchedCallbacks.push(...callbacks);
+        }
+      }
+
+      matchedCallbacks.forEach((callback) => {
         try {
           callback(mqttMessage);
         } catch (error) {
@@ -120,6 +125,27 @@ export class MqttService implements OnModuleInit {
     } catch (error) {
       this.logger.error('Error parsing MQTT message:', error);
     }
+  }
+
+  /**
+   * Check if an MQTT topic matches a subscription pattern
+   * Supports '+' (single-level) and '#' (multi-level) wildcards
+   */
+  private topicMatchesPattern(topic: string, pattern: string): boolean {
+    if (topic === pattern) return true;
+
+    const topicParts = topic.split('/');
+    const patternParts = pattern.split('/');
+
+    for (let i = 0; i < patternParts.length; i++) {
+      if (patternParts[i] === '#') return true;
+      if (patternParts[i] === '+') continue;
+      if (i >= topicParts.length || patternParts[i] !== topicParts[i]) {
+        return false;
+      }
+    }
+
+    return topicParts.length === patternParts.length;
   }
 
   private extractDeviceId(topic: string): string {
