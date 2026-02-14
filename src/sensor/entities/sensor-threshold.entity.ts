@@ -11,9 +11,10 @@ import {
 
 import { SensorConfig } from './sensor-config.entity';
 import { ThresholdLevel } from '../enums/threshold-level.enum';
+import { ThresholdType } from '../enums/threshold-type.enum';
 
 @Entity()
-@Unique(['sensorConfigId', 'level'])
+@Unique(['sensorConfigId', 'level', 'type'])
 export class SensorThreshold {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -33,11 +34,14 @@ export class SensorThreshold {
   })
   level: ThresholdLevel;
 
-  @Column({ type: 'float', nullable: true })
-  minThreshold: number;
+  @Column({
+    type: 'enum',
+    enum: ThresholdType,
+  })
+  type: ThresholdType;
 
-  @Column({ type: 'float', nullable: true })
-  maxThreshold: number;
+  @Column({ type: 'float' })
+  threshold: number;
 
   @Column({ type: 'varchar' })
   action: string;

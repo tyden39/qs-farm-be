@@ -1,21 +1,20 @@
-import { IsEnum, IsOptional, IsNumber, IsString } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEnum, IsNumber, IsString } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 import { ThresholdLevel } from '../enums/threshold-level.enum';
+import { ThresholdType } from '../enums/threshold-type.enum';
 
 export class CreateSensorThresholdDto {
   @ApiProperty({ enum: ThresholdLevel })
   @IsEnum(ThresholdLevel)
   level: ThresholdLevel;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  minThreshold?: number;
+  @ApiProperty({ enum: ThresholdType })
+  @IsEnum(ThresholdType)
+  type: ThresholdType;
 
-  @ApiPropertyOptional()
-  @IsOptional()
+  @ApiProperty()
   @IsNumber()
-  maxThreshold?: number;
+  threshold: number;
 
   @ApiProperty()
   @IsString()

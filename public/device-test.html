@@ -293,10 +293,7 @@
                 addLog('📡 Device Status: ' + JSON.stringify(data), 'success');
             });
 
-            socket.on('subscribed', (data) => {
-                addLog('Subscribed to: ' + JSON.stringify(data), 'success');
-            });
-
+            // Server sends "subscribed" via ack callback on emit, not as a separate event
             socket.on('unsubscribed', (data) => {
                 addLog('Unsubscribed from: ' + JSON.stringify(data));
             });
@@ -328,8 +325,14 @@
                 return;
             }
 
-            socket.emit('subscribeToDevice', { deviceId });
             addLog('Subscribing to device: ' + deviceId);
+            socket.emit('subscribeToDevice', { deviceId }, (ack) => {
+                if (ack) {
+                    addLog('Subscribed: ' + JSON.stringify(ack), 'success');
+                } else {
+                    addLog('Subscribe ack missing (check server)', 'error');
+                }
+            });
         }
 
         function unsubscribeFromDevice() {

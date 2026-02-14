@@ -49,11 +49,16 @@ services:
     restart: always
     env_file:
       - .env
+    environment:
+      DB_HOST: db
+      MQTT_BROKER_URL: mqtt://emqx:1883
     ports:
       - "3040:3000"
     depends_on:
-      - db
-      - emqx
+      db:
+        condition: service_healthy
+      emqx:
+        condition: service_healthy
 
 volumes:
   emqx-data:

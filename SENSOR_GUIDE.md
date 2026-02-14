@@ -172,11 +172,28 @@ PATCH /api/sensor/device/{deviceId}/alerts/{alertId}/acknowledge
 
 ## 6. WebSocket Events
 
-Connect to Socket.IO namespace `/device` with JWT auth, then subscribe to a device room:
+Connect to Socket.IO namespace `/device` with JWT auth, then subscribe to a device room.
+
+**Set up listeners first** (before or right after connect), then emit subscribe:
 
 ```javascript
-socket.emit('subscribeToDevice', { deviceId: 'xxx' });
+// 1. Listen for connection confirmation
+socket.on('connected', (msg) => {
+  console.log('Server:', msg.message);
+});
+
+// 2. Listen for subscribe acknowledgment (use the callback on emit)
+socket.emit('subscribeToDevice', { deviceId: 'xxx' }, (ack) => {
+  if (ack) console.log('Subscribed:', ack);  // { event: 'subscribed', data: { deviceId, room } }
+});
+
+// 3. Listen for device data (telemetry, alerts, commands) — required to receive anything
+socket.on('deviceData', (msg) => {
+  console.log('deviceData', msg.data?.type, msg);
+});
 ```
+
+If you only `emit('subscribeToDevice', ...)` without a callback, you won't see the "subscribed" response. If you don't listen to `deviceData`, you won't receive telemetry or alerts. Data is only pushed when the device sends telemetry or when a threshold triggers an alert/command.
 
 You'll receive these `deviceData` events:
 
@@ -198,6 +215,16 @@ socket.on('deviceData', (msg) => {
   // msg.data = { type, command, sensorType, level, value, threshold, reason }
 });
 ```
+
+`deviceData` only fires when there is something to send (device telemetry, threshold alert, or command). If the device is idle or not configured, you won't get events until it reports or a threshold is hit.
+
+### Troubleshooting: "I receive nothing"
+
+| What you see | Cause | What to do |
+|--------------|--------|------------|
+| No `connected` event, socket disconnects | Invalid/missing JWT or wrong URL/namespace | Use a valid access token in `auth: { token }` or `Authorization: Bearer <token>`. Connect to `http://localhost:3000/device` (or your API base + `/device`). Check server logs for "Authentication error" or "connected without token". |
+| `connected` but no confirmation after subscribe | You're not using the ack callback | Use `socket.emit('subscribeToDevice', { deviceId: 'xxx' }, (ack) => { console.log(ack); });` so the server's return value is received. The server does **not** emit a `subscribed` event; it only replies via this callback. |
+| Subscribed (ack received) but no `deviceData` | Normal: no telemetry or alerts yet | `deviceData` is only sent when (1) the device sends telemetry over MQTT, or (2) a threshold triggers an alert/command. Ensure the device exists, is paired, and is publishing to the broker; or trigger a threshold to see alerts. Use `public/device-test.html` and watch the log for `connected`, the subscribe ack, and any `deviceData`. |
 
 ---
 

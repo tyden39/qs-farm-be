@@ -5,21 +5,23 @@ import { Repository } from 'typeorm';
 import { MqttService } from 'src/device/mqtt/mqtt.service';
 import { DeviceGateway } from 'src/device/websocket/device.gateway';
 import { SensorConfig } from './entities/sensor-config.entity';
+import { SensorThreshold } from './entities/sensor-threshold.entity';
 import { AlertLog, AlertDirection } from './entities/alert-log.entity';
 import { CommandLog, CommandSource } from './entities/command-log.entity';
 import { ThresholdLevel } from './enums/threshold-level.enum';
+import { ThresholdType } from './enums/threshold-type.enum';
 import { SENSOR_REASON_MAP } from './constants/threshold-rules';
 
 @Injectable()
 export class ThresholdService {
   private readonly logger = new Logger(ThresholdService.name);
 
-  // Anti-spam: state machine
-  // Map<deviceId, Map<action, currentState>>
-  private deviceStates: Map<string, Map<string, boolean>> = new Map();
+  // Anti-spam: state machine per threshold identity
+  // Map<`${deviceId}:${sensorType}:${level}:${type}`, boolean>
+  private thresholdStates: Map<string, boolean> = new Map();
 
-  // Anti-spam: cooldown
-  // Map<`${deviceId}:${sensorType}`, timestamp>
+  // Anti-spam: cooldown per threshold identity
+  // Map<`${deviceId}:${sensorType}:${level}:${type}`, timestamp>
   private lastActionTime: Map<string, number> = new Map();
   private readonly COOLDOWN_MS = 30_000;
 
@@ -39,7 +41,16 @@ export class ThresholdService {
   ) {
     const { sensorType, thresholds } = config;
 
-    // Sort: CRITICAL first, then WARNING
+    // Pass 1: Clear states for all non-violated thresholds
+    for (const threshold of thresholds) {
+      const violated = this.isViolated(value, threshold);
+      if (!violated) {
+        const stateKey = this.stateKey(deviceId, sensorType, threshold);
+        this.thresholdStates.delete(stateKey);
+      }
+    }
+
+    // Pass 2: Process violations, CRITICAL first
     const sorted = [...thresholds].sort((a, b) => {
       if (a.level === ThresholdLevel.CRITICAL) return -1;
       if (b.level === ThresholdLevel.CRITICAL) return 1;
@@ -47,42 +58,27 @@ export class ThresholdService {
     });
 
     for (const threshold of sorted) {
-      let direction: AlertDirection | null = null;
-      let thresholdValue: number | null = null;
+      if (!this.isViolated(value, threshold)) continue;
 
-      if (
-        threshold.minThreshold !== null &&
-        threshold.minThreshold !== undefined &&
-        value < threshold.minThreshold
-      ) {
-        direction = AlertDirection.BELOW;
-        thresholdValue = threshold.minThreshold;
-      } else if (
-        threshold.maxThreshold !== null &&
-        threshold.maxThreshold !== undefined &&
-        value > threshold.maxThreshold
-      ) {
-        direction = AlertDirection.ABOVE;
-        thresholdValue = threshold.maxThreshold;
-      }
-
-      if (direction === null) continue;
-
-      // Anti-spam checks
-      if (!this.shouldDispatch(deviceId, sensorType, threshold.action)) {
+      const stateKey = this.stateKey(deviceId, sensorType, threshold);
+      if (!this.shouldDispatch(stateKey)) {
         this.logger.debug(
-          `Anti-spam blocked: ${threshold.action} for ${deviceId}/${sensorType}`,
+          `Anti-spam blocked: ${threshold.action} for ${deviceId}/${sensorType}/${threshold.level}:${threshold.type}`,
         );
         return;
       }
 
       const reasonMap = SENSOR_REASON_MAP[sensorType];
       const reason =
-        direction === AlertDirection.BELOW
+        threshold.type === ThresholdType.MIN
           ? reasonMap?.belowMin
           : reasonMap?.aboveMax;
 
-      // Dispatch command (skip if ALERT_ONLY)
+      const direction =
+        threshold.type === ThresholdType.MIN
+          ? AlertDirection.BELOW
+          : AlertDirection.ABOVE;
+
       if (threshold.action !== 'ALERT_ONLY') {
         try {
           await this.mqttService.publishToDevice(
@@ -93,7 +89,7 @@ export class ThresholdService {
               sensorType,
               level: threshold.level,
               value,
-              threshold: thresholdValue,
+              threshold: threshold.threshold,
             },
           );
 
@@ -103,7 +99,7 @@ export class ThresholdService {
             sensorType,
             level: threshold.level,
             value,
-            threshold: thresholdValue,
+            threshold: threshold.threshold,
             reason,
           });
 
@@ -111,7 +107,7 @@ export class ThresholdService {
             this.commandLogRepo.create({
               deviceId,
               command: threshold.action,
-              params: { reason, sensorType, level: threshold.level, value, threshold: thresholdValue },
+              params: { reason, sensorType, level: threshold.level, value, threshold: threshold.threshold },
               source: CommandSource.AUTOMATED,
               sensorType,
               reason,
@@ -128,7 +124,7 @@ export class ThresholdService {
             this.commandLogRepo.create({
               deviceId,
               command: threshold.action,
-              params: { reason, sensorType, level: threshold.level, value, threshold: thresholdValue },
+              params: { reason, sensorType, level: threshold.level, value, threshold: threshold.threshold },
               source: CommandSource.AUTOMATED,
               sensorType,
               reason,
@@ -139,12 +135,11 @@ export class ThresholdService {
         }
       }
 
-      // Log alert
       const alertLog = this.alertLogRepo.create({
         deviceId,
         sensorType,
         value,
-        threshold: thresholdValue,
+        threshold: threshold.threshold,
         level: threshold.level,
         direction,
         action: threshold.action,
@@ -152,12 +147,11 @@ export class ThresholdService {
       });
       await this.alertLogRepo.save(alertLog);
 
-      // Broadcast alert to WebSocket
       this.deviceGateway.broadcastDeviceData(deviceId, {
         type: 'alert',
         sensorType,
         value,
-        threshold: thresholdValue,
+        threshold: threshold.threshold,
         level: threshold.level,
         direction,
         action: threshold.action,
@@ -165,52 +159,40 @@ export class ThresholdService {
       });
 
       this.logger.log(
-        `Alert: ${sensorType} ${direction} ${thresholdValue} (value=${value}, level=${threshold.level}, action=${threshold.action})`,
+        `Alert: ${sensorType} ${direction} ${threshold.threshold} (value=${value}, level=${threshold.level}, action=${threshold.action})`,
       );
 
-      // Stop at first violation (CRITICAL takes priority)
       return;
     }
-
-    // No violation — clear state for this sensor's actions
-    this.clearStatesForSensor(deviceId, config);
   }
 
-  private shouldDispatch(
+  private isViolated(value: number, threshold: SensorThreshold): boolean {
+    return threshold.type === ThresholdType.MIN
+      ? value < threshold.threshold
+      : value > threshold.threshold;
+  }
+
+  private stateKey(
     deviceId: string,
     sensorType: string,
-    action: string,
-  ): boolean {
-    // State machine check
-    const deviceStateMap =
-      this.deviceStates.get(deviceId) || new Map<string, boolean>();
-    const currentState = deviceStateMap.get(action);
+    threshold: SensorThreshold,
+  ): string {
+    return `${deviceId}:${sensorType}:${threshold.level}:${threshold.type}`;
+  }
 
-    if (currentState === true) {
-      return false; // Already in this state
+  private shouldDispatch(stateKey: string): boolean {
+    if (this.thresholdStates.get(stateKey) === true) {
+      return false;
     }
 
-    // Cooldown check
-    const cooldownKey = `${deviceId}:${sensorType}`;
-    const lastTime = this.lastActionTime.get(cooldownKey);
+    const lastTime = this.lastActionTime.get(stateKey);
     if (lastTime && Date.now() - lastTime < this.COOLDOWN_MS) {
       return false;
     }
 
-    // Update state and cooldown
-    deviceStateMap.set(action, true);
-    this.deviceStates.set(deviceId, deviceStateMap);
-    this.lastActionTime.set(cooldownKey, Date.now());
+    this.thresholdStates.set(stateKey, true);
+    this.lastActionTime.set(stateKey, Date.now());
 
     return true;
-  }
-
-  private clearStatesForSensor(deviceId: string, config: SensorConfig) {
-    const deviceStateMap = this.deviceStates.get(deviceId);
-    if (!deviceStateMap) return;
-
-    for (const threshold of config.thresholds) {
-      deviceStateMap.delete(threshold.action);
-    }
   }
 }
