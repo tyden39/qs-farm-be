@@ -537,9 +537,8 @@ docker-compose logs emqx
 # MQTT_BROKER_URL=mqtt://localhost:1883 (dev)
 # MQTT_BROKER_URL=mqtt://emqx:1883 (docker network)
 
-# Test MQTT connection
-docker run --rm -it eclipse-mosquitto \
-  mosquitto_pub -h emqx -t "test" -m "hello"
+# Test MQTT connection: use EMQX Dashboard (http://localhost:18083) → Tools → WebSocket Client,
+# or any MQTT client connecting to emqx:1883 (e.g. mqtt://emqx:1883 from host, mqtt://localhost:1883 from host)
 ```
 
 ### WebSocket Connection Issues

@@ -2,11 +2,6 @@
 /dist
 /node_modules
 
-# MQTT broker data
-/mosquitto/data/*
-/mosquitto/log/*
-!/mosquitto/config/
-
 # Logs
 logs
 *.log
