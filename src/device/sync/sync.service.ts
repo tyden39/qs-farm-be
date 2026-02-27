@@ -129,6 +129,19 @@ export class SyncService implements OnModuleInit {
       ...payload,
       receivedAt: timestamp,
     });
+
+    // Detect firmware OTA_UPDATE response
+    if (payload.command === 'OTA_UPDATE') {
+      this.eventEmitter.emit('firmware.update.reported', {
+        deviceId,
+        version: payload.version,
+        success: payload.success,
+        errorMessage: payload.error,
+        duration: payload.duration,
+        previousVersion: payload.previousVersion,
+        timestamp,
+      });
+    }
   }
 
   /**
