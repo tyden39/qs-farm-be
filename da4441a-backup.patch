@@ -1,0 +1,426 @@
+diff --git a/SENSOR_GUIDE.md b/SENSOR_GUIDE.md
+index 5e600ce..f1f4899 100644
+--- a/SENSOR_GUIDE.md
++++ b/SENSOR_GUIDE.md
+@@ -172,12 +172,29 @@ PATCH /api/sensor/device/{deviceId}/alerts/{alertId}/acknowledge
+ 
+ ## 6. WebSocket Events
+ 
+-Connect to Socket.IO namespace `/device` with JWT auth, then subscribe to a device room:
++Connect to Socket.IO namespace `/device` with JWT auth, then subscribe to a device room.
++
++**Set up listeners first** (before or right after connect), then emit subscribe:
+ 
+ ```javascript
+-socket.emit('subscribeToDevice', { deviceId: 'xxx' });
++// 1. Listen for connection confirmation
++socket.on('connected', (msg) => {
++  console.log('Server:', msg.message);
++});
++
++// 2. Listen for subscribe acknowledgment (use the callback on emit)
++socket.emit('subscribeToDevice', { deviceId: 'xxx' }, (ack) => {
++  if (ack) console.log('Subscribed:', ack);  // { event: 'subscribed', data: { deviceId, room } }
++});
++
++// 3. Listen for device data (telemetry, alerts, commands) — required to receive anything
++socket.on('deviceData', (msg) => {
++  console.log('deviceData', msg.data?.type, msg);
++});
+ ```
+ 
++If you only `emit('subscribeToDevice', ...)` without a callback, you won't see the "subscribed" response. If you don't listen to `deviceData`, you won't receive telemetry or alerts. Data is only pushed when the device sends telemetry or when a threshold triggers an alert/command.
++
+ You'll receive these `deviceData` events:
+ 
+ ```javascript
+@@ -199,6 +216,16 @@ socket.on('deviceData', (msg) => {
+ });
+ ```
+ 
++`deviceData` only fires when there is something to send (device telemetry, threshold alert, or command). If the device is idle or not configured, you won't get events until it reports or a threshold is hit.
++
++### Troubleshooting: "I receive nothing"
++
++| What you see | Cause | What to do |
++|--------------|--------|------------|
++| No `connected` event, socket disconnects | Invalid/missing JWT or wrong URL/namespace | Use a valid access token in `auth: { token }` or `Authorization: Bearer <token>`. Connect to `http://localhost:3000/device` (or your API base + `/device`). Check server logs for "Authentication error" or "connected without token". |
++| `connected` but no confirmation after subscribe | You're not using the ack callback | Use `socket.emit('subscribeToDevice', { deviceId: 'xxx' }, (ack) => { console.log(ack); });` so the server's return value is received. The server does **not** emit a `subscribed` event; it only replies via this callback. |
++| Subscribed (ack received) but no `deviceData` | Normal: no telemetry or alerts yet | `deviceData` is only sent when (1) the device sends telemetry over MQTT, or (2) a threshold triggers an alert/command. Ensure the device exists, is paired, and is publishing to the broker; or trigger a threshold to see alerts. Use `public/device-test.html` and watch the log for `connected`, the subscribe ack, and any `deviceData`. |
++
+ ---
+ 
+ ## 7. Anti-Spam
+diff --git a/docker-compose.yml b/docker-compose.yml
+index a80845f..145925e 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -49,11 +49,16 @@ services:
+     restart: always
+     env_file:
+       - .env
++    environment:
++      DB_HOST: db
++      MQTT_BROKER_URL: mqtt://emqx:1883
+     ports:
+       - "3040:3000"
+     depends_on:
+-      - db
+-      - emqx
++      db:
++        condition: service_healthy
++      emqx:
++        condition: service_healthy
+ 
+ volumes:
+   emqx-data:
+diff --git a/public/device-test.html b/public/device-test.html
+index dcd4ad4..903c7b3 100644
+--- a/public/device-test.html
++++ b/public/device-test.html
+@@ -293,10 +293,7 @@
+                 addLog('📡 Device Status: ' + JSON.stringify(data), 'success');
+             });
+ 
+-            socket.on('subscribed', (data) => {
+-                addLog('Subscribed to: ' + JSON.stringify(data), 'success');
+-            });
+-
++            // Server sends "subscribed" via ack callback on emit, not as a separate event
+             socket.on('unsubscribed', (data) => {
+                 addLog('Unsubscribed from: ' + JSON.stringify(data));
+             });
+@@ -328,8 +325,14 @@
+                 return;
+             }
+ 
+-            socket.emit('subscribeToDevice', { deviceId });
+             addLog('Subscribing to device: ' + deviceId);
++            socket.emit('subscribeToDevice', { deviceId }, (ack) => {
++                if (ack) {
++                    addLog('Subscribed: ' + JSON.stringify(ack), 'success');
++                } else {
++                    addLog('Subscribe ack missing (check server)', 'error');
++                }
++            });
+         }
+ 
+         function unsubscribeFromDevice() {
+diff --git a/src/sensor/dto/create-sensor-threshold.dto.ts b/src/sensor/dto/create-sensor-threshold.dto.ts
+index c1a1cae..7ff10f1 100644
+--- a/src/sensor/dto/create-sensor-threshold.dto.ts
++++ b/src/sensor/dto/create-sensor-threshold.dto.ts
+@@ -1,21 +1,20 @@
+-import { IsEnum, IsOptional, IsNumber, IsString } from 'class-validator';
+-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
++import { IsEnum, IsNumber, IsString } from 'class-validator';
++import { ApiProperty } from '@nestjs/swagger';
+ import { ThresholdLevel } from '../enums/threshold-level.enum';
++import { ThresholdType } from '../enums/threshold-type.enum';
+ 
+ export class CreateSensorThresholdDto {
+   @ApiProperty({ enum: ThresholdLevel })
+   @IsEnum(ThresholdLevel)
+   level: ThresholdLevel;
+ 
+-  @ApiPropertyOptional()
+-  @IsOptional()
+-  @IsNumber()
+-  minThreshold?: number;
++  @ApiProperty({ enum: ThresholdType })
++  @IsEnum(ThresholdType)
++  type: ThresholdType;
+ 
+-  @ApiPropertyOptional()
+-  @IsOptional()
++  @ApiProperty()
+   @IsNumber()
+-  maxThreshold?: number;
++  threshold: number;
+ 
+   @ApiProperty()
+   @IsString()
+diff --git a/src/sensor/entities/sensor-threshold.entity.ts b/src/sensor/entities/sensor-threshold.entity.ts
+index e966ee2..aa4db0c 100644
+--- a/src/sensor/entities/sensor-threshold.entity.ts
++++ b/src/sensor/entities/sensor-threshold.entity.ts
+@@ -11,9 +11,10 @@ import {
+ 
+ import { SensorConfig } from './sensor-config.entity';
+ import { ThresholdLevel } from '../enums/threshold-level.enum';
++import { ThresholdType } from '../enums/threshold-type.enum';
+ 
+ @Entity()
+-@Unique(['sensorConfigId', 'level'])
++@Unique(['sensorConfigId', 'level', 'type'])
+ export class SensorThreshold {
+   @PrimaryGeneratedColumn('uuid')
+   id: string;
+@@ -33,11 +34,14 @@ export class SensorThreshold {
+   })
+   level: ThresholdLevel;
+ 
+-  @Column({ type: 'float', nullable: true })
+-  minThreshold: number;
++  @Column({
++    type: 'enum',
++    enum: ThresholdType,
++  })
++  type: ThresholdType;
+ 
+-  @Column({ type: 'float', nullable: true })
+-  maxThreshold: number;
++  @Column({ type: 'float' })
++  threshold: number;
+ 
+   @Column({ type: 'varchar' })
+   action: string;
+diff --git a/src/sensor/enums/threshold-type.enum.ts b/src/sensor/enums/threshold-type.enum.ts
+new file mode 100644
+index 0000000..8776f7d
+--- /dev/null
++++ b/src/sensor/enums/threshold-type.enum.ts
+@@ -0,0 +1,4 @@
++export enum ThresholdType {
++  MIN = 'min',
++  MAX = 'max',
++}
+diff --git a/src/sensor/threshold.service.ts b/src/sensor/threshold.service.ts
+index cdf76a4..1e8ccac 100644
+--- a/src/sensor/threshold.service.ts
++++ b/src/sensor/threshold.service.ts
+@@ -5,21 +5,23 @@ import { Repository } from 'typeorm';
+ import { MqttService } from 'src/device/mqtt/mqtt.service';
+ import { DeviceGateway } from 'src/device/websocket/device.gateway';
+ import { SensorConfig } from './entities/sensor-config.entity';
++import { SensorThreshold } from './entities/sensor-threshold.entity';
+ import { AlertLog, AlertDirection } from './entities/alert-log.entity';
+ import { CommandLog, CommandSource } from './entities/command-log.entity';
+ import { ThresholdLevel } from './enums/threshold-level.enum';
++import { ThresholdType } from './enums/threshold-type.enum';
+ import { SENSOR_REASON_MAP } from './constants/threshold-rules';
+ 
+ @Injectable()
+ export class ThresholdService {
+   private readonly logger = new Logger(ThresholdService.name);
+ 
+-  // Anti-spam: state machine
+-  // Map<deviceId, Map<action, currentState>>
+-  private deviceStates: Map<string, Map<string, boolean>> = new Map();
++  // Anti-spam: state machine per threshold identity
++  // Map<`${deviceId}:${sensorType}:${level}:${type}`, boolean>
++  private thresholdStates: Map<string, boolean> = new Map();
+ 
+-  // Anti-spam: cooldown
+-  // Map<`${deviceId}:${sensorType}`, timestamp>
++  // Anti-spam: cooldown per threshold identity
++  // Map<`${deviceId}:${sensorType}:${level}:${type}`, timestamp>
+   private lastActionTime: Map<string, number> = new Map();
+   private readonly COOLDOWN_MS = 30_000;
+ 
+@@ -39,7 +41,16 @@ export class ThresholdService {
+   ) {
+     const { sensorType, thresholds } = config;
+ 
+-    // Sort: CRITICAL first, then WARNING
++    // Pass 1: Clear states for all non-violated thresholds
++    for (const threshold of thresholds) {
++      const violated = this.isViolated(value, threshold);
++      if (!violated) {
++        const stateKey = this.stateKey(deviceId, sensorType, threshold);
++        this.thresholdStates.delete(stateKey);
++      }
++    }
++
++    // Pass 2: Process violations, CRITICAL first
+     const sorted = [...thresholds].sort((a, b) => {
+       if (a.level === ThresholdLevel.CRITICAL) return -1;
+       if (b.level === ThresholdLevel.CRITICAL) return 1;
+@@ -47,42 +58,27 @@ export class ThresholdService {
+     });
+ 
+     for (const threshold of sorted) {
+-      let direction: AlertDirection | null = null;
+-      let thresholdValue: number | null = null;
+-
+-      if (
+-        threshold.minThreshold !== null &&
+-        threshold.minThreshold !== undefined &&
+-        value < threshold.minThreshold
+-      ) {
+-        direction = AlertDirection.BELOW;
+-        thresholdValue = threshold.minThreshold;
+-      } else if (
+-        threshold.maxThreshold !== null &&
+-        threshold.maxThreshold !== undefined &&
+-        value > threshold.maxThreshold
+-      ) {
+-        direction = AlertDirection.ABOVE;
+-        thresholdValue = threshold.maxThreshold;
+-      }
++      if (!this.isViolated(value, threshold)) continue;
+ 
+-      if (direction === null) continue;
+-
+-      // Anti-spam checks
+-      if (!this.shouldDispatch(deviceId, sensorType, threshold.action)) {
++      const stateKey = this.stateKey(deviceId, sensorType, threshold);
++      if (!this.shouldDispatch(stateKey)) {
+         this.logger.debug(
+-          `Anti-spam blocked: ${threshold.action} for ${deviceId}/${sensorType}`,
++          `Anti-spam blocked: ${threshold.action} for ${deviceId}/${sensorType}/${threshold.level}:${threshold.type}`,
+         );
+         return;
+       }
+ 
+       const reasonMap = SENSOR_REASON_MAP[sensorType];
+       const reason =
+-        direction === AlertDirection.BELOW
++        threshold.type === ThresholdType.MIN
+           ? reasonMap?.belowMin
+           : reasonMap?.aboveMax;
+ 
+-      // Dispatch command (skip if ALERT_ONLY)
++      const direction =
++        threshold.type === ThresholdType.MIN
++          ? AlertDirection.BELOW
++          : AlertDirection.ABOVE;
++
+       if (threshold.action !== 'ALERT_ONLY') {
+         try {
+           await this.mqttService.publishToDevice(
+@@ -93,7 +89,7 @@ export class ThresholdService {
+               sensorType,
+               level: threshold.level,
+               value,
+-              threshold: thresholdValue,
++              threshold: threshold.threshold,
+             },
+           );
+ 
+@@ -103,7 +99,7 @@ export class ThresholdService {
+             sensorType,
+             level: threshold.level,
+             value,
+-            threshold: thresholdValue,
++            threshold: threshold.threshold,
+             reason,
+           });
+ 
+@@ -111,7 +107,7 @@ export class ThresholdService {
+             this.commandLogRepo.create({
+               deviceId,
+               command: threshold.action,
+-              params: { reason, sensorType, level: threshold.level, value, threshold: thresholdValue },
++              params: { reason, sensorType, level: threshold.level, value, threshold: threshold.threshold },
+               source: CommandSource.AUTOMATED,
+               sensorType,
+               reason,
+@@ -128,7 +124,7 @@ export class ThresholdService {
+             this.commandLogRepo.create({
+               deviceId,
+               command: threshold.action,
+-              params: { reason, sensorType, level: threshold.level, value, threshold: thresholdValue },
++              params: { reason, sensorType, level: threshold.level, value, threshold: threshold.threshold },
+               source: CommandSource.AUTOMATED,
+               sensorType,
+               reason,
+@@ -139,12 +135,11 @@ export class ThresholdService {
+         }
+       }
+ 
+-      // Log alert
+       const alertLog = this.alertLogRepo.create({
+         deviceId,
+         sensorType,
+         value,
+-        threshold: thresholdValue,
++        threshold: threshold.threshold,
+         level: threshold.level,
+         direction,
+         action: threshold.action,
+@@ -152,12 +147,11 @@ export class ThresholdService {
+       });
+       await this.alertLogRepo.save(alertLog);
+ 
+-      // Broadcast alert to WebSocket
+       this.deviceGateway.broadcastDeviceData(deviceId, {
+         type: 'alert',
+         sensorType,
+         value,
+-        threshold: thresholdValue,
++        threshold: threshold.threshold,
+         level: threshold.level,
+         direction,
+         action: threshold.action,
+@@ -165,52 +159,40 @@ export class ThresholdService {
+       });
+ 
+       this.logger.log(
+-        `Alert: ${sensorType} ${direction} ${thresholdValue} (value=${value}, level=${threshold.level}, action=${threshold.action})`,
++        `Alert: ${sensorType} ${direction} ${threshold.threshold} (value=${value}, level=${threshold.level}, action=${threshold.action})`,
+       );
+ 
+-      // Stop at first violation (CRITICAL takes priority)
+       return;
+     }
++  }
+ 
+-    // No violation — clear state for this sensor's actions
+-    this.clearStatesForSensor(deviceId, config);
++  private isViolated(value: number, threshold: SensorThreshold): boolean {
++    return threshold.type === ThresholdType.MIN
++      ? value < threshold.threshold
++      : value > threshold.threshold;
+   }
+ 
+-  private shouldDispatch(
++  private stateKey(
+     deviceId: string,
+     sensorType: string,
+-    action: string,
+-  ): boolean {
+-    // State machine check
+-    const deviceStateMap =
+-      this.deviceStates.get(deviceId) || new Map<string, boolean>();
+-    const currentState = deviceStateMap.get(action);
+-
+-    if (currentState === true) {
+-      return false; // Already in this state
++    threshold: SensorThreshold,
++  ): string {
++    return `${deviceId}:${sensorType}:${threshold.level}:${threshold.type}`;
++  }
++
++  private shouldDispatch(stateKey: string): boolean {
++    if (this.thresholdStates.get(stateKey) === true) {
++      return false;
+     }
+ 
+-    // Cooldown check
+-    const cooldownKey = `${deviceId}:${sensorType}`;
+-    const lastTime = this.lastActionTime.get(cooldownKey);
++    const lastTime = this.lastActionTime.get(stateKey);
+     if (lastTime && Date.now() - lastTime < this.COOLDOWN_MS) {
+       return false;
+     }
+ 
+-    // Update state and cooldown
+-    deviceStateMap.set(action, true);
+-    this.deviceStates.set(deviceId, deviceStateMap);
+-    this.lastActionTime.set(cooldownKey, Date.now());
++    this.thresholdStates.set(stateKey, true);
++    this.lastActionTime.set(stateKey, Date.now());
+ 
+     return true;
+   }
+-
+-  private clearStatesForSensor(deviceId: string, config: SensorConfig) {
+-    const deviceStateMap = this.deviceStates.get(deviceId);
+-    if (!deviceStateMap) return;
+-
+-    for (const threshold of config.thresholds) {
+-      deviceStateMap.delete(threshold.action);
+-    }
+-  }
+ }
