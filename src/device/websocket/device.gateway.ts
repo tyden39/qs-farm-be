@@ -7,9 +7,10 @@ import {
   MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserService } from 'src/user/user.service';
 
 @WebSocketGateway({
@@ -29,6 +30,7 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     private readonly userService: UserService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -135,6 +137,37 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
         command: data.command,
         timestamp: new Date().toISOString(),
       },
+    };
+  }
+
+  /**
+   * Mobile app requests firmware update for devices
+   */
+  @SubscribeMessage('requestFirmwareUpdate')
+  handleRequestFirmwareUpdate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: { firmwareId: string; deviceIds?: string[]; farmId?: string },
+  ) {
+    const userId = client.data.userId;
+    if (!userId) {
+      return {
+        event: 'firmwareUpdateError',
+        data: { message: 'Not authenticated' },
+      };
+    }
+
+    this.eventEmitter.emit('firmware.update.requested', {
+      firmwareId: data.firmwareId,
+      deviceIds: data.deviceIds,
+      farmId: data.farmId,
+      userId,
+      socketId: client.id,
+    });
+
+    return {
+      event: 'firmwareUpdateAck',
+      data: { message: 'Firmware update request received', firmwareId: data.firmwareId },
     };
   }
 

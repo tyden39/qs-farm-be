@@ -14,6 +14,7 @@ import { EmqxModule } from './emqx/emqx.module';
 import { ProvisionModule } from './provision/provision.module';
 import { SensorModule } from './sensor/sensor.module';
 import { ScheduleModule } from './schedule/schedule.module';
+import { FirmwareModule } from './firmware/firmware.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ScheduleModule } from './schedule/schedule.module';
     ProvisionModule,
     SensorModule,
     ScheduleModule,
+    FirmwareModule,
   ],
   providers: [],
 })
