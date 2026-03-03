@@ -11,6 +11,7 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
@@ -30,6 +31,8 @@ import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 @ApiTags('Firmware')
 @Controller('firmware')
 export class FirmwareController {
+  private readonly logger = new Logger(FirmwareController.name);
+
   constructor(private readonly firmwareService: FirmwareService) {}
 
   @Post('upload')
@@ -59,6 +62,9 @@ export class FirmwareController {
 
   @Post('report')
   async report(@Body() dto: FirmwareReportDto) {
+    this.logger.log(
+      `ESP OTA report: device=${dto.deviceId} version=${dto.version} status=${dto.status}`,
+    );
     return this.firmwareService.handleUpdateReport({
       deviceId: dto.deviceId,
       version: dto.version,

@@ -217,6 +217,9 @@ export class FirmwareService {
 
       // Send OTA command via MQTT
       try {
+        this.logger.log(
+          `Sending OTA command: device=${device.id} firmware=${firmware.version}`,
+        );
         await this.syncService.sendCommandToDevice(device.id, 'OTA_UPDATE', {
           version: firmware.version,
           downloadUrl: `/api/firmware/download/${firmware.id}`,
@@ -265,6 +268,10 @@ export class FirmwareService {
     duration?: number;
     previousVersion?: string;
   }) {
+    this.logger.log(
+      `OTA report received: device=${data.deviceId} version=${data.version} success=${data.success}`,
+    );
+
     // Find the pending log for this device
     const log = await this.updateLogRepository.findOne({
       where: { deviceId: data.deviceId, status: FirmwareUpdateStatus.PENDING },
@@ -279,6 +286,27 @@ export class FirmwareService {
       log.duration = data.duration;
       log.reportedAt = new Date();
       await this.updateLogRepository.save(log);
+      this.logger.log(`OTA log updated: logId=${log.id} status=${log.status}`);
+    } else {
+      // Self-initiated OTA: no deploy() was called, create log from report
+      const firmware = await this.firmwareRepository.findOne({
+        where: { version: data.version },
+      });
+      const newLog = this.updateLogRepository.create({
+        firmwareId: firmware?.id,
+        deviceId: data.deviceId,
+        previousVersion: data.previousVersion,
+        status: data.success
+          ? FirmwareUpdateStatus.SUCCESS
+          : FirmwareUpdateStatus.FAILED,
+        errorMessage: data.errorMessage,
+        duration: data.duration,
+        reportedAt: new Date(),
+      });
+      const saved = await this.updateLogRepository.save(newLog);
+      this.logger.log(
+        `OTA log created (self-initiated): logId=${saved.id} device=${data.deviceId} status=${saved.status}`,
+      );
     }
 
     // Update device firmware version on success
