@@ -46,6 +46,9 @@ services:
   nest-backend:
     image: ghcr.io/tyden39/qs-farm-be:latest
     restart: always
+    volumes:
+      # Map: [Local Path] : [Container Path]
+      - ./qs-farm-test-firebase-adminsdk-fbsvc-12c9996b25.json:/app/service-account.json
     env_file:
       - .env
     ports:
