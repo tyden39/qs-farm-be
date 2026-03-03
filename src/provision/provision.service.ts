@@ -61,7 +61,7 @@ export class ProvisionService {
       });
 
       // If device exists and is already paired, reject
-      if (device && device.status === DeviceStatus.ACTIVE) {
+      if (device && device.status === DeviceStatus.PAIRED) {
         this.logger.warn(`Device already paired: ${serial}`);
         return null;
       }
@@ -235,8 +235,7 @@ export class ProvisionService {
     }
 
     if (
-      device.status !== DeviceStatus.PAIRED &&
-      device.status !== DeviceStatus.ACTIVE
+      device.status !== DeviceStatus.PAIRED
     ) {
       throw new BadRequestException(
         `Cannot regenerate token for device in ${device.status} status`,

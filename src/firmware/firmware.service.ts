@@ -197,9 +197,9 @@ export class FirmwareService {
       throw new BadRequestException('Provide deviceIds or farmId');
     }
 
-    // Filter only ACTIVE devices
+    // Filter only PAIRED devices
     const activeDevices = devices.filter(
-      (d) => d.status === DeviceStatus.ACTIVE,
+      (d) => d.status === DeviceStatus.PAIRED,
     );
 
     const results = [];
