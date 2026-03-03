@@ -4,7 +4,7 @@
 
 The IoT Farm Management Platform follows a phased development approach, progressing from core infrastructure through IoT integration to production hardening and advanced features. This document tracks project phases, milestones, and planned features.
 
-**Current Status:** Phase 2 Complete - Full IoT integration with device management, sensor monitoring, and scheduling operational.
+**Current Status:** Phase 2 Complete + FCM Push Notifications delivered ahead of Phase 4 schedule.
 
 ## Phase 1: Core Infrastructure (Complete - 100%)
 
@@ -179,10 +179,14 @@ The IoT Farm Management Platform follows a phased development approach, progress
 ### Planned Features
 
 #### 4.1 Notification System
+- ✅ **FCM push notifications for mobile app** (delivered 2026-03-03, ahead of schedule)
+  - DeviceToken registration/unregistration endpoints
+  - Sensor threshold alerts → FCM push to farm owner
+  - Schedule execution → FCM push to farm owner
+  - Auto-cleanup of stale FCM tokens
 - Email alerts on threshold breach
 - SMS alerts (Twilio integration)
 - In-app notifications with notification center
-- Push notifications for mobile app
 - User notification preferences/settings
 - Notification templates and customization
 
@@ -225,6 +229,7 @@ The IoT Farm Management Platform follows a phased development approach, progress
 - Conditional execution (if sensor X > Y then execute)
 
 ### Success Criteria
+- [x] FCM push notifications delivered to mobile app on alert/schedule
 - [ ] Email notifications sent < 5 seconds after alert
 - [ ] Analytics dashboards load in < 2 seconds
 - [ ] Mobile app achieves > 4.5 star rating
@@ -312,7 +317,8 @@ Phase 1: Core Infrastructure
        ├─ Threshold Alerts ✅
        ├─ Command Scheduling ✅
        ├─ Command Logging ✅
-       └─ EMQX Integration ✅
+       ├─ EMQX Integration ✅
+       └─ FCM Push Notifications ✅ (early delivery)
           │
           └─→ Phase 3: Production Hardening
               │
@@ -407,7 +413,8 @@ Phase 1: Core Infrastructure
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2026-02-25
+**Document Version:** 1.1
+**Last Updated:** 2026-03-03
 **Phase 1-2 Status:** Complete
 **Phase 3-5 Status:** Planned (High confidence in Phase 3 timeline)
+**FCM Push:** Delivered early (2026-03-03), ahead of Phase 4 schedule

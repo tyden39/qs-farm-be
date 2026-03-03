@@ -148,7 +148,7 @@
 │                   ▼                                               │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │ Sensor Module (Processing & Alerts)                        │  │
-│  │  ├── imports: DeviceModule                                │  │
+│  │  ├── imports: DeviceModule, NotificationModule            │  │
 │  │  │                                                         │  │
 │  │  ├── SensorService @OnEvent('telemetry.received')         │  │
 │  │  │   ├── Stores readings in SensorData (time-series)      │  │
@@ -159,11 +159,12 @@
 │  │  │   └── Logs commands on command.dispatched event        │  │
 │  │  │                                                         │  │
 │  │  ├── ThresholdService                                      │  │
-│  │  │   ├── evaluate(deviceId, config, value)                │  │
+│  │  │   ├── evaluate(deviceId, farmId, config, value)        │  │
 │  │  │   ├── Checks CRITICAL first, then WARNING              │  │
 │  │  │   ├── Anti-spam: 30s cooldown per sensor               │  │
 │  │  │   ├── Publishes command to device via SyncService      │  │
 │  │  │   ├── Broadcasts alert via DeviceGateway               │  │
+│  │  │   ├── Sends FCM push via FcmService (fire-and-forget)  │  │
 │  │  │   └── Logs to CommandLog (source: AUTOMATED)           │  │
 │  │  │                                                         │  │
 │  │  ├── SensorConfig entity (deviceId, sensorType unique)    │  │
@@ -175,7 +176,8 @@
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │ Schedule Module (Command Scheduling)                       │  │
-│  │  ├── imports: NestScheduleModule, DeviceModule            │  │
+│  │  ├── imports: NestScheduleModule, DeviceModule,           │  │
+│  │  │           NotificationModule                            │  │
 │  │  │                                                         │  │
 │  │  ├── ScheduleService                                       │  │
 │  │  │   ├── @Interval(60_000) processSchedules               │  │
@@ -185,6 +187,7 @@
 │  │  │   ├── Farm-wide or single-device targeting             │  │
 │  │  │   ├── Auto-disable after one-time execution            │  │
 │  │  │   ├── Catches up missed executions on restart          │  │
+│  │  │   ├── Sends FCM push via FcmService after execution    │  │
 │  │  │   └── Publishes via SyncService.sendCommandToDevice()  │  │
 │  │  │                                                         │  │
 │  │  ├── DeviceSchedule entity (recurring + one-time)         │  │
@@ -228,6 +231,27 @@
 │  │  │   └── Topic isolation & farm scoping                   │  │
 │  │  │                                                         │  │
 │  │  └── EMQX endpoints (auth, ACL validation)                │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                   │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │ Notification Module (FCM Push)                             │  │
+│  │  ├── imports: TypeOrmModule (DeviceToken)                 │  │
+│  │  ├── exports: FcmService                                  │  │
+│  │  │                                                         │  │
+│  │  ├── FcmService (OnModuleInit)                             │  │
+│  │  │   ├── Initializes Firebase Admin SDK on startup        │  │
+│  │  │   ├── Graceful degradation if env var not set          │  │
+│  │  │   ├── sendToFarmOwner(farmId, notification)            │  │
+│  │  │   │   • Queries DeviceToken via Farm → User join       │  │
+│  │  │   │   • Sends via sendEachForMulticast                 │  │
+│  │  │   │   • Auto-removes stale/invalid tokens on failure   │  │
+│  │  │   └── Fire-and-forget (never throws to caller)        │  │
+│  │  │                                                         │  │
+│  │  ├── NotificationController                                │  │
+│  │  │   ├── POST /api/notification/register-token (upsert)   │  │
+│  │  │   └── DELETE /api/notification/unregister-token        │  │
+│  │  │                                                         │  │
+│  │  └── DeviceToken entity (userId FK, token unique, platform)│  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
@@ -367,6 +391,18 @@
 │ used: bool               │
 │ createdAt                │
 └──────────────────────────┘
+
+┌──────────────────────────┐
+│ DeviceToken              │
+├──────────────────────────┤
+│ id: UUID (PK)            │
+│ userId: UUID (FK)        │
+│ token: str (unique)      │
+│ platform: enum (IOS      │
+│   | ANDROID)             │
+│ createdAt                │
+│ updatedAt                │
+└──────────────────────────┘
 ```
 
 ## Real-Time Data Flows
@@ -399,6 +435,7 @@
      a) Publishes command to device/+/cmd via MqttService
      b) Creates CommandLog entry (source: AUTOMATED)
      c) Broadcasts alert via DeviceGateway.io.to('device:{id}').emit('deviceAlert')
+     d) Sends FCM push to farm owner via FcmService.sendToFarmOwner() (fire-and-forget)
    - Always creates AlertLog entry
    - Time: ~30-80ms
 
@@ -524,6 +561,7 @@ ScheduleService @Interval(60_000):
    - Emit 'command.dispatched' event
    - Update lastExecutedAt timestamp
    - For one-time: set enabled = false
+   - Send FCM push to farm owner via FcmService.sendToFarmOwner() (fire-and-forget)
    - Time per schedule: ~20-50ms
 
 5. executing = false (release lock)
@@ -777,6 +815,6 @@ Trigger: ProvisionService.pairDevice()
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2026-02-25
-**Architecture Pattern:** NestJS 8 with MQTT + WebSocket dual transport
+**Document Version:** 1.1
+**Last Updated:** 2026-03-03
+**Architecture Pattern:** NestJS 8 with MQTT + WebSocket dual transport + FCM push notifications
