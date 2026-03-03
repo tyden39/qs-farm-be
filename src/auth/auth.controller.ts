@@ -61,8 +61,12 @@ export class AuthController {
   }
 
   @Post('/refresh-token')
-  async updateTokens(@Req() req: Request, @Body() refreshTokenDto: RefreshTokenDto) {
-    const refreshToken = req.cookies.refreshToken || refreshTokenDto.refreshToken;
+  async updateTokens(
+    @Req() req: Request,
+    @Body() refreshTokenDto: RefreshTokenDto,
+  ) {
+    const refreshToken =
+      req.cookies.refreshToken || refreshTokenDto.refreshToken;
 
     const accessToken = await this.authService.updateAccessToken(refreshToken);
 
@@ -80,10 +84,7 @@ export class AuthController {
 
   @Post('/verify-otp')
   async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
-    return this.authService.verifyOtp(
-      verifyOtpDto.username,
-      verifyOtpDto.otp,
-    );
+    return this.authService.verifyOtp(verifyOtpDto.username, verifyOtpDto.otp);
   }
 
   @Post('/reset-password')

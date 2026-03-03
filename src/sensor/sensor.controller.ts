@@ -55,10 +55,7 @@ export class SensorController {
   }
 
   @Delete('device/:deviceId/config/:id')
-  removeConfig(
-    @Param('deviceId') deviceId: string,
-    @Param('id') id: string,
-  ) {
+  removeConfig(@Param('deviceId') deviceId: string, @Param('id') id: string) {
     return this.sensorService.removeConfig(deviceId, id);
   }
 

@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
@@ -28,7 +33,9 @@ export class ProvisionService {
     try {
       const { serial, hw, nonce } = payload;
 
-      this.logger.log(`Provisioning request from serial: ${serial}, hw: ${hw}, nonce: ${nonce}`);
+      this.logger.log(
+        `Provisioning request from serial: ${serial}, hw: ${hw}, nonce: ${nonce}`,
+      );
 
       // Validate serial format
       if (!serial || serial.length === 0) {
@@ -105,7 +112,9 @@ export class ProvisionService {
     try {
       const { serial, farmId, pairingToken } = dto;
 
-      this.logger.log(`Pairing device: ${serial} to farm: ${farmId} for user: ${userId}`);
+      this.logger.log(
+        `Pairing device: ${serial} to farm: ${farmId} for user: ${userId}`,
+      );
 
       // Find device by serial (no relations – avoid duplicate farmId assignment)
       const device = await this.deviceRepository.findOne({
@@ -117,7 +126,10 @@ export class ProvisionService {
       }
 
       // Check if device is in provisioning state
-      if (device.status !== DeviceStatus.PENDING && device.status !== DeviceStatus.PAIRED) {
+      if (
+        device.status !== DeviceStatus.PENDING &&
+        device.status !== DeviceStatus.PAIRED
+      ) {
         throw new BadRequestException(
           `Device cannot be paired. Status: ${device.status}`,
         );
@@ -170,10 +182,9 @@ export class ProvisionService {
       });
 
       // Mark pairing token as used
-      await this.pairingTokenRepository.update(
-        pairingTokenRecord.id,
-        { used: true },
-      );
+      await this.pairingTokenRepository.update(pairingTokenRecord.id, {
+        used: true,
+      });
 
       this.logger.log(`Device paired: ${serial} (${device.id})`);
 
@@ -223,7 +234,10 @@ export class ProvisionService {
       throw new NotFoundException(`Device not found: ${deviceId}`);
     }
 
-    if (device.status !== DeviceStatus.PAIRED && device.status !== DeviceStatus.ACTIVE) {
+    if (
+      device.status !== DeviceStatus.PAIRED &&
+      device.status !== DeviceStatus.ACTIVE
+    ) {
       throw new BadRequestException(
         `Cannot regenerate token for device in ${device.status} status`,
       );
@@ -275,7 +289,7 @@ export class ProvisionService {
 
     const now = new Date();
 
-    return tokens.map(token => ({
+    return tokens.map((token) => ({
       id: token.id,
       serial: token.serial,
       token: token.token,
@@ -300,7 +314,9 @@ export class ProvisionService {
 
     await this.pairingTokenRepository.delete(tokenId);
 
-    this.logger.log(`Pairing token deleted: ${tokenId} (serial: ${token.serial})`);
+    this.logger.log(
+      `Pairing token deleted: ${tokenId} (serial: ${token.serial})`,
+    );
 
     return {
       message: 'Pairing token deleted successfully',
@@ -350,7 +366,9 @@ export class ProvisionService {
     await this.pairingTokenRepository.remove(tokensToDelete);
 
     this.logger.log(
-      `Deleted ${tokensToDelete.length} pairing tokens (filter: ${filter || 'all'})`,
+      `Deleted ${tokensToDelete.length} pairing tokens (filter: ${
+        filter || 'all'
+      })`,
     );
 
     return {
@@ -391,22 +409,21 @@ export class ProvisionService {
     pairingToken: string,
   ) {
     try {
-      await this.mqttService.publishToTopic(
-        `provision/resp/${nonce}`,
-        {
-          status: 'provisioned',
-          deviceId: deviceId,
-          pairingToken: pairingToken,
-          message: 'Device provisioned. Ready for pairing.',
-          timestamp: new Date().toISOString(),
-        },
-      );
+      await this.mqttService.publishToTopic(`provision/resp/${nonce}`, {
+        status: 'provisioned',
+        deviceId: deviceId,
+        pairingToken: pairingToken,
+        message: 'Device provisioned. Ready for pairing.',
+        timestamp: new Date().toISOString(),
+      });
 
       this.logger.debug(
         `Published provision response to provision/resp/${nonce} for device ${deviceId}`,
       );
     } catch (error) {
-      this.logger.warn(`Failed to publish provision response: ${error.message}`);
+      this.logger.warn(
+        `Failed to publish provision response: ${error.message}`,
+      );
     }
   }
 
@@ -417,16 +434,13 @@ export class ProvisionService {
     farmId: string,
   ) {
     try {
-      await this.mqttService.publishToTopic(
-        `device/${deviceId}/cmd`,
-        {
-          cmd: 'set_owner',
-          ownerId: userId,
-          farmId: farmId,
-          token: deviceToken,
-          timestamp: new Date().toISOString(),
-        },
-      );
+      await this.mqttService.publishToTopic(`device/${deviceId}/cmd`, {
+        cmd: 'set_owner',
+        ownerId: userId,
+        farmId: farmId,
+        token: deviceToken,
+        timestamp: new Date().toISOString(),
+      });
 
       this.logger.debug(`Published set_owner command for device ${deviceId}`);
     } catch (error) {

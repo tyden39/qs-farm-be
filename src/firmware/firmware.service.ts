@@ -51,8 +51,12 @@ export class FirmwareService {
     });
     if (existing) {
       // Clean up uploaded file
-      try { unlinkSync(file.path); } catch {}
-      throw new ConflictException(`Firmware version ${dto.version} already exists`);
+      try {
+        unlinkSync(file.path);
+      } catch {}
+      throw new ConflictException(
+        `Firmware version ${dto.version} already exists`,
+      );
     }
 
     // Compute MD5 checksum
@@ -315,9 +319,7 @@ export class FirmwareService {
       );
       for (const device of devices) {
         if (!device.farm || device.farm.userId !== userId) {
-          throw new ForbiddenException(
-            `Device ${device.id} not owned by you`,
-          );
+          throw new ForbiddenException(`Device ${device.id} not owned by you`);
         }
       }
     } else {
@@ -368,7 +370,9 @@ export class FirmwareService {
     const firmware = await this.findOne(id);
 
     // Delete file from disk
-    try { unlinkSync(firmware.filePath); } catch {}
+    try {
+      unlinkSync(firmware.filePath);
+    } catch {}
 
     return this.firmwareRepository.remove(firmware);
   }

@@ -7,9 +7,7 @@ import { PairingToken } from 'src/device/entities/pairing-token.entity';
 import { MqttService } from 'src/device/mqtt/mqtt.service';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Device, PairingToken]),
-  ],
+  imports: [TypeOrmModule.forFeature([Device, PairingToken])],
   providers: [ProvisionService, MqttService],
   controllers: [ProvisionController],
   exports: [ProvisionService],

@@ -11,12 +11,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiConsumes,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 import { DeviceService } from './device.service';
@@ -54,9 +49,7 @@ export class DeviceController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post()
-  async create(
-    @Body() createDeviceDto: CreateDeviceDto,
-  ) {
+  async create(@Body() createDeviceDto: CreateDeviceDto) {
     return this.deviceService.create(createDeviceDto, createDeviceDto.farmId);
   }
 

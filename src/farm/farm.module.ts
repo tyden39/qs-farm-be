@@ -7,10 +7,7 @@ import { FarmService } from './farm.service';
 import { FilesModule } from 'src/files/files.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Farm]),
-    FilesModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Farm]), FilesModule],
   controllers: [FarmController],
   providers: [FarmService],
   exports: [FarmService],

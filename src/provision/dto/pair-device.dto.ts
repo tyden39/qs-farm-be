@@ -6,11 +6,17 @@ export class PairDeviceDto {
   @IsString()
   serial: string;
 
-  @ApiProperty({ description: 'Pairing token from device provisioning (REQUIRED)', example: 'abc123def456...' })
+  @ApiProperty({
+    description: 'Pairing token from device provisioning (REQUIRED)',
+    example: 'abc123def456...',
+  })
   @IsString()
   pairingToken: string;
 
-  @ApiProperty({ description: 'Farm UUID to pair device with', example: '550e8400-e29b-41d4-a716-446655440000' })
+  @ApiProperty({
+    description: 'Farm UUID to pair device with',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @IsUUID()
   farmId: string;
 }

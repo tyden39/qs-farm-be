@@ -46,10 +46,11 @@ export class FilesService {
       });
     }
 
-    const apiPrefix = this.configService.get('app.apiPrefix', {
-      infer: true,
-    }) || 'api';
-    
+    const apiPrefix =
+      this.configService.get('app.apiPrefix', {
+        infer: true,
+      }) || 'api';
+
     // Get filename from file.filename, file.path, or generate it
     // Multer with diskStorage should set file.filename, but if not, extract from path
     let filename = file.filename;
@@ -58,10 +59,11 @@ export class FilesService {
     }
     // If still no filename, generate it using the same logic as multer config
     if (!filename) {
-      const extension = file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
+      const extension =
+        file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
       filename = `${randomStringGenerator()}.${extension}`;
     }
-    
+
     // Store only the filename, the full URL will be constructed when needed
     const fileEntity = this.fileRepository.create({
       path: `/${apiPrefix}/v1/files/${filename}`,

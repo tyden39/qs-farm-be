@@ -11,6 +11,7 @@ import { CommandLog } from './entities/command-log.entity';
 import { SensorService } from './sensor.service';
 import { SensorController } from './sensor.controller';
 import { ThresholdService } from './threshold.service';
+import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ThresholdService } from './threshold.service';
       Device,
     ]),
     DeviceModule,
+    NotificationModule,
   ],
   controllers: [SensorController],
   providers: [SensorService, ThresholdService],

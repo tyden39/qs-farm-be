@@ -68,7 +68,7 @@ export class SyncService implements OnModuleInit {
 
       if (result) {
         this.logger.log(`Device provisioned: ${payload.serial}`);
-        
+
         // Broadcast to mobile clients
         this.deviceGateway.broadcast('deviceProvisioned', {
           deviceId: result.deviceId,

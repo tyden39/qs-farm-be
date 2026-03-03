@@ -21,9 +21,7 @@ export class EmqxController {
   async authenticate(@Body() body: EmqxAuthDto) {
     const result = await this.emqxService.authenticate(body);
 
-    this.logger.debug(
-      `Auth: ${body.username} - ${result ? 'ALLOW' : 'DENY'}`,
-    );
+    this.logger.debug(`Auth: ${body.username} - ${result ? 'ALLOW' : 'DENY'}`);
 
     return {
       result: result ? 'allow' : 'deny',
@@ -42,7 +40,9 @@ export class EmqxController {
 
     const accessType = body.access === 1 ? 'SUB' : 'PUB';
     this.logger.debug(
-      `ACL: ${body.username} ${accessType} ${body.topic} - ${result ? 'ALLOW' : 'DENY'}`,
+      `ACL: ${body.username} ${accessType} ${body.topic} - ${
+        result ? 'ALLOW' : 'DENY'
+      }`,
     );
 
     return {

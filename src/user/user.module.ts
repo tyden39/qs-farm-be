@@ -4,10 +4,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { diskStorage } from 'multer';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
-import {
-  HttpStatus,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { HttpStatus, UnprocessableEntityException } from '@nestjs/common';
 
 import { UserService } from './user.service';
 import { UserController } from './user.controller';

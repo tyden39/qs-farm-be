@@ -72,7 +72,9 @@ export class SensorService {
     try {
       // Parse payload into individual sensor readings
       const readings: { sensorType: string; value: number }[] = [];
-      for (const [field, sensorType] of Object.entries(PAYLOAD_TO_SENSOR_TYPE)) {
+      for (const [field, sensorType] of Object.entries(
+        PAYLOAD_TO_SENSOR_TYPE,
+      )) {
         if (payload[field] !== undefined && payload[field] !== null) {
           readings.push({ sensorType, value: Number(payload[field]) });
         }
@@ -93,6 +95,10 @@ export class SensorService {
       // Load configs (cached)
       const configs = await this.getConfigsForDevice(deviceId);
 
+      // Lookup device farmId for FCM notifications
+      const device = await this.deviceRepo.findOne(deviceId);
+      const farmId = device?.farmId;
+
       // Evaluate thresholds for each reading
       for (const reading of readings) {
         const config = configs.find(
@@ -105,6 +111,7 @@ export class SensorService {
 
         await this.thresholdService.evaluate(
           deviceId,
+          farmId,
           config,
           reading.value,
         );

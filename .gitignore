@@ -46,3 +46,7 @@ lerna-debug.log*
 .cursor/
 
 repomix-output.xml
+
+# Firebase service account key
+*-firebase-adminsdk-*.json
+firebase-service-account*.json

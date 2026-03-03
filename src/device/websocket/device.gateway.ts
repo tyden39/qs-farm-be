@@ -35,7 +35,9 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleConnection(client: Socket) {
     try {
-      const token = client.handshake.auth.token || client.handshake.headers.authorization?.replace('Bearer ', '');
+      const token =
+        client.handshake.auth.token ||
+        client.handshake.headers.authorization?.replace('Bearer ', '');
 
       if (!token) {
         this.logger.warn(`Client ${client.id} connected without token`);
@@ -89,10 +91,10 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const { deviceId } = data;
     const room = `device:${deviceId}`;
-    
+
     client.join(room);
     this.logger.log(`Client ${client.id} subscribed to device ${deviceId}`);
-    
+
     return {
       event: 'subscribed',
       data: { deviceId, room },
@@ -109,10 +111,10 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const { deviceId } = data;
     const room = `device:${deviceId}`;
-    
+
     client.leave(room);
     this.logger.log(`Client ${client.id} unsubscribed from device ${deviceId}`);
-    
+
     return {
       event: 'unsubscribed',
       data: { deviceId },
@@ -128,7 +130,7 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { deviceId: string; command: string; params: any },
   ) {
     this.logger.log(`Command from client ${client.id}:`, data);
-    
+
     // This will be handled by the sync service
     return {
       event: 'commandQueued',
@@ -167,7 +169,10 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     return {
       event: 'firmwareUpdateAck',
-      data: { message: 'Firmware update request received', firmwareId: data.firmwareId },
+      data: {
+        message: 'Firmware update request received',
+        firmwareId: data.firmwareId,
+      },
     };
   }
 
@@ -181,7 +186,7 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       data,
       timestamp: new Date().toISOString(),
     });
-    
+
     this.logger.debug(`Broadcasted data to ${room}:`, data);
   }
 
@@ -195,7 +200,7 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       status,
       timestamp: new Date().toISOString(),
     });
-    
+
     this.logger.debug(`Broadcasted status to ${room}:`, status);
   }
 
@@ -207,7 +212,7 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       .filter(([_, uid]) => uid === userId)
       .map(([socketId, _]) => socketId);
 
-    socketIds.forEach(socketId => {
+    socketIds.forEach((socketId) => {
       this.server.to(socketId).emit(event, data);
     });
   }

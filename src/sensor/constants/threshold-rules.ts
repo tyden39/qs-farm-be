@@ -1,6 +1,9 @@
 import { SensorType } from '../enums/sensor-type.enum';
 
-export const SENSOR_REASON_MAP: Record<SensorType, { belowMin: string; aboveMax: string }> = {
+export const SENSOR_REASON_MAP: Record<
+  SensorType,
+  { belowMin: string; aboveMax: string }
+> = {
   [SensorType.SOIL_MOISTURE]: {
     belowMin: 'LOW_MOISTURE',
     aboveMax: 'HIGH_MOISTURE',

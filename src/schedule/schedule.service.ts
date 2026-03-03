@@ -8,11 +8,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Interval } from '@nestjs/schedule';
 import { Repository } from 'typeorm';
 
-import { DeviceSchedule, ScheduleType } from './entities/device-schedule.entity';
+import {
+  DeviceSchedule,
+  ScheduleType,
+} from './entities/device-schedule.entity';
 import { CreateDeviceScheduleDto } from './dto/create-device-schedule.dto';
 import { UpdateDeviceScheduleDto } from './dto/update-device-schedule.dto';
 import { SyncService } from 'src/device/sync/sync.service';
 import { DeviceService } from 'src/device/device.service';
+import { FcmService } from 'src/notification/fcm.service';
 
 @Injectable()
 export class ScheduleService {
@@ -24,6 +28,7 @@ export class ScheduleService {
     private readonly scheduleRepository: Repository<DeviceSchedule>,
     private readonly syncService: SyncService,
     private readonly deviceService: DeviceService,
+    private readonly fcmService: FcmService,
   ) {}
 
   async findAll(deviceId?: string, farmId?: string) {
@@ -100,9 +105,7 @@ export class ScheduleService {
       }
     } else if (type === ScheduleType.ONE_TIME) {
       if (!fields.executeAt) {
-        throw new BadRequestException(
-          'One-time schedules require executeAt',
-        );
+        throw new BadRequestException('One-time schedules require executeAt');
       }
     }
   }
@@ -240,5 +243,28 @@ export class ScheduleService {
       schedule.enabled = false;
     }
     await this.scheduleRepository.save(schedule);
+
+    // Push notification for schedule execution
+    const farmId =
+      schedule.farmId ||
+      (schedule.deviceId
+        ? (await this.deviceService.findOne(schedule.deviceId))?.farmId
+        : null);
+
+    if (farmId) {
+      this.fcmService
+        .sendToFarmOwner(farmId, {
+          title: `Schedule: ${schedule.name}`,
+          body: `Command "${schedule.command}" executed`,
+          data: {
+            type: 'SCHEDULE_EXECUTED',
+            scheduleId: schedule.id,
+            command: schedule.command,
+          },
+        })
+        .catch((err) =>
+          this.logger.error('FCM schedule notification failed:', err.message),
+        );
+    }
   }
 }

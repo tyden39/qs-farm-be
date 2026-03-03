@@ -9,6 +9,7 @@ import { AlertLog, AlertDirection } from './entities/alert-log.entity';
 import { CommandLog, CommandSource } from './entities/command-log.entity';
 import { ThresholdLevel } from './enums/threshold-level.enum';
 import { SENSOR_REASON_MAP } from './constants/threshold-rules';
+import { FcmService } from 'src/notification/fcm.service';
 
 @Injectable()
 export class ThresholdService {
@@ -26,6 +27,7 @@ export class ThresholdService {
   constructor(
     private readonly mqttService: MqttService,
     private readonly deviceGateway: DeviceGateway,
+    private readonly fcmService: FcmService,
     @InjectRepository(AlertLog)
     private readonly alertLogRepo: Repository<AlertLog>,
     @InjectRepository(CommandLog)
@@ -34,6 +36,7 @@ export class ThresholdService {
 
   async evaluate(
     deviceId: string,
+    farmId: string,
     config: SensorConfig,
     value: number,
   ) {
@@ -85,17 +88,13 @@ export class ThresholdService {
       // Dispatch command (skip if ALERT_ONLY)
       if (threshold.action !== 'ALERT_ONLY') {
         try {
-          await this.mqttService.publishToDevice(
-            deviceId,
-            threshold.action,
-            {
-              reason,
-              sensorType,
-              level: threshold.level,
-              value,
-              threshold: thresholdValue,
-            },
-          );
+          await this.mqttService.publishToDevice(deviceId, threshold.action, {
+            reason,
+            sensorType,
+            level: threshold.level,
+            value,
+            threshold: thresholdValue,
+          });
 
           this.deviceGateway.broadcastDeviceData(deviceId, {
             type: 'command_dispatched',
@@ -111,7 +110,13 @@ export class ThresholdService {
             this.commandLogRepo.create({
               deviceId,
               command: threshold.action,
-              params: { reason, sensorType, level: threshold.level, value, threshold: thresholdValue },
+              params: {
+                reason,
+                sensorType,
+                level: threshold.level,
+                value,
+                threshold: thresholdValue,
+              },
               source: CommandSource.AUTOMATED,
               sensorType,
               reason,
@@ -124,18 +129,26 @@ export class ThresholdService {
             error,
           );
 
-          await this.commandLogRepo.save(
-            this.commandLogRepo.create({
-              deviceId,
-              command: threshold.action,
-              params: { reason, sensorType, level: threshold.level, value, threshold: thresholdValue },
-              source: CommandSource.AUTOMATED,
-              sensorType,
-              reason,
-              success: false,
-              errorMessage: error.message,
-            }),
-          ).catch((e) => this.logger.error('Failed to log command:', e));
+          await this.commandLogRepo
+            .save(
+              this.commandLogRepo.create({
+                deviceId,
+                command: threshold.action,
+                params: {
+                  reason,
+                  sensorType,
+                  level: threshold.level,
+                  value,
+                  threshold: thresholdValue,
+                },
+                source: CommandSource.AUTOMATED,
+                sensorType,
+                reason,
+                success: false,
+                errorMessage: error.message,
+              }),
+            )
+            .catch((e) => this.logger.error('Failed to log command:', e));
         }
       }
 
@@ -151,6 +164,23 @@ export class ThresholdService {
         reason,
       });
       await this.alertLogRepo.save(alertLog);
+
+      // Push notification via FCM
+      if (farmId) {
+        this.fcmService
+          .sendToFarmOwner(farmId, {
+            title: `${threshold.level.toUpperCase()} Alert: ${sensorType}`,
+            body: reason ?? `${sensorType} alert (${direction})`,
+            data: {
+              type: 'SENSOR_ALERT',
+              deviceId,
+              sensorType,
+              level: threshold.level,
+              alertLogId: alertLog.id,
+            },
+          })
+          .catch((err) => this.logger.error('FCM alert failed:', err.message));
+      }
 
       // Broadcast alert to WebSocket
       this.deviceGateway.broadcastDeviceData(deviceId, {

@@ -1,10 +1,13 @@
-import { Controller, Post, Body, UseGuards, Param, Get, Logger } from '@nestjs/common';
 import {
-  ApiBearerAuth,
-  ApiTags,
-  ApiBody,
-  ApiResponse,
-} from '@nestjs/swagger';
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Param,
+  Get,
+  Logger,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags, ApiBody, ApiResponse } from '@nestjs/swagger';
 import { ProvisionService } from './provision.service';
 import { PairDeviceDto } from './dto/pair-device.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -34,10 +37,7 @@ export class ProvisionController {
   @Post('pair')
   @ApiBody({ type: PairDeviceDto })
   @ApiResponse({ status: 200, description: 'Device paired successfully' })
-  async pairDevice(
-    @CurrentUser() user: any,
-    @Body() dto: PairDeviceDto,
-  ) {
+  async pairDevice(@CurrentUser() user: any, @Body() dto: PairDeviceDto) {
     return this.provisionService.pairDevice(user.id, dto);
   }
 
@@ -80,7 +80,10 @@ export class ProvisionController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('pairing-tokens/:tokenId/delete')
-  @ApiResponse({ status: 200, description: 'Pairing token deleted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pairing token deleted successfully',
+  })
   async deletePairingToken(@Param('tokenId') tokenId: string) {
     return this.provisionService.deletePairingToken(tokenId);
   }
@@ -91,8 +94,13 @@ export class ProvisionController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('pairing-tokens/delete-all')
-  @ApiResponse({ status: 200, description: 'Pairing tokens deleted successfully' })
-  async deleteAllPairingTokens(@Body() body?: { filter?: 'expired' | 'used' | 'all' }) {
+  @ApiResponse({
+    status: 200,
+    description: 'Pairing tokens deleted successfully',
+  })
+  async deleteAllPairingTokens(
+    @Body() body?: { filter?: 'expired' | 'used' | 'all' },
+  ) {
     return this.provisionService.deleteAllPairingTokens(body?.filter);
   }
 }

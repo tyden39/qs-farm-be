@@ -11,12 +11,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiConsumes,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 import { FarmService } from './farm.service';
@@ -50,10 +45,7 @@ export class FarmController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post()
-  async create(
-    @Req() req: any,
-    @Body() createFarmDto: CreateFarmDto,
-  ) {
+  async create(@Req() req: any, @Body() createFarmDto: CreateFarmDto) {
     return this.farmService.create(createFarmDto, req.user.id);
   }
 
@@ -81,25 +73,19 @@ export class FarmController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     let imageUrl = '';
-    
+
     if (file) {
       const uploadedFile = await this.filesService.create(file);
       imageUrl = uploadedFile.file.path;
     }
 
-    return this.farmService.create(
-      { name, image: imageUrl },
-      req.user.id,
-    );
+    return this.farmService.create({ name, image: imageUrl }, req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Patch(':id')
-  async update(
-    @Param('id') id: string,
-    @Body() updateFarmDto: UpdateFarmDto,
-  ) {
+  async update(@Param('id') id: string, @Body() updateFarmDto: UpdateFarmDto) {
     return this.farmService.update(id, updateFarmDto);
   }
 

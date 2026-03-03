@@ -15,6 +15,7 @@ import { ProvisionModule } from './provision/provision.module';
 import { SensorModule } from './sensor/sensor.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { FirmwareModule } from './firmware/firmware.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { FirmwareModule } from './firmware/firmware.module';
     SensorModule,
     ScheduleModule,
     FirmwareModule,
+    NotificationModule,
   ],
   providers: [],
 })

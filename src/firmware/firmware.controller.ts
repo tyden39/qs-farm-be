@@ -111,10 +111,7 @@ export class FirmwareController {
   @Post(':id/deploy')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async deploy(
-    @Param('id') id: string,
-    @Body() dto: DeployFirmwareDto,
-  ) {
+  async deploy(@Param('id') id: string, @Body() dto: DeployFirmwareDto) {
     return this.firmwareService.deploy(id, dto);
   }
 

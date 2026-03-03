@@ -1,4 +1,9 @@
-import { IsEnum, IsOptional, IsDateString, IsNumberString } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsDateString,
+  IsNumberString,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { CommandSource } from '../entities/command-log.entity';
 

@@ -62,11 +62,11 @@ export class FilesController {
   @ApiExcludeEndpoint()
   download(@Param('filename') filename: string, @Res() response: Response) {
     const filePath = join(process.cwd(), 'files', filename);
-    
+
     if (!existsSync(filePath)) {
       throw new NotFoundException('File not found');
     }
-    
+
     return response.sendFile(filePath);
   }
 }

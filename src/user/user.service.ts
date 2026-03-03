@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { Repository } from 'typeorm';
@@ -51,7 +48,9 @@ export class UserService {
   async create(createUserDto: CreateUserDto) {
     const user = await this.userRepository.create({
       ...createUserDto,
-      avatar: createUserDto.avatar || 'https://ui-avatars.com/api/?name=' + createUserDto.username,
+      avatar:
+        createUserDto.avatar ||
+        'https://ui-avatars.com/api/?name=' + createUserDto.username,
       is_admin: createUserDto.is_admin || false,
     });
 

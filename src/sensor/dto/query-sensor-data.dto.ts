@@ -1,4 +1,9 @@
-import { IsEnum, IsOptional, IsDateString, IsNumberString } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsDateString,
+  IsNumberString,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { SensorType } from '../enums/sensor-type.enum';
 
