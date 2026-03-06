@@ -122,7 +122,9 @@ export class SyncService implements OnModuleInit {
   private handleDeviceResponse(message: MqttMessage) {
     const { deviceId, topic, payload, timestamp } = message;
 
-    this.logger.log(`Device response from ${deviceId}: command=${payload.command} success=${payload.success}`);
+    this.logger.log(
+      `Device response from ${deviceId}: command=${payload.command} success=${payload.success}`,
+    );
 
     this.deviceGateway.broadcastDeviceStatus(deviceId, {
       type: 'commandResponse',

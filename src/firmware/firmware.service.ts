@@ -382,16 +382,32 @@ export class FirmwareService {
     }
   }
 
-  async getUpdateLogs(filters: { deviceId?: string; firmwareId?: string }) {
+  async getUpdateLogs(filters: {
+    deviceId?: string;
+    firmwareId?: string;
+    page?: number;
+    limit?: number;
+  }) {
     const where: any = {};
     if (filters.deviceId) where.deviceId = filters.deviceId;
     if (filters.firmwareId) where.firmwareId = filters.firmwareId;
 
-    return this.updateLogRepository.find({
+    const page = filters.page || 1;
+    const limit = filters.limit || 50;
+
+    const rows = await this.updateLogRepository.find({
       where,
       order: { createdAt: 'DESC' },
       relations: ['firmware', 'device'],
+      skip: (page - 1) * limit,
+      take: limit + 1,
     });
+
+    const hasNextPage = rows.length > limit;
+    return {
+      data: hasNextPage ? rows.slice(0, limit) : rows,
+      hasNextPage,
+    };
   }
 
   async remove(id: string) {

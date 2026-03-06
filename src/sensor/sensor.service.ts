@@ -302,7 +302,13 @@ export class SensorService {
       });
     }
 
-    return qb.getMany();
+    const page = query.page || 1;
+    const limit = query.limit || 50;
+    qb.skip((page - 1) * limit).take(limit + 1);
+
+    const rows = await qb.getMany();
+    const hasNextPage = rows.length > limit;
+    return { data: hasNextPage ? rows.slice(0, limit) : rows, hasNextPage };
   }
 
   async acknowledgeAlert(deviceId: string, id: string) {
@@ -424,10 +430,13 @@ export class SensorService {
       qb.andWhere('cl.createdAt <= :to', { to: query.to });
     }
 
-    const limit = query.limit ? parseInt(query.limit, 10) : 50;
-    qb.take(limit);
+    const page = query.page || 1;
+    const limit = query.limit || 50;
+    qb.skip((page - 1) * limit).take(limit + 1);
 
-    return qb.getMany();
+    const rows = await qb.getMany();
+    const hasNextPage = rows.length > limit;
+    return { data: hasNextPage ? rows.slice(0, limit) : rows, hasNextPage };
   }
 
   // --- Farm-Level Reports ---

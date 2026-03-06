@@ -24,6 +24,7 @@ import { UpdateFirmwareDto } from './dto/update-firmware.dto';
 import { CheckUpdateQueryDto } from './dto/check-update-query.dto';
 import { DeployFirmwareDto } from './dto/deploy-firmware.dto';
 import { FirmwareReportDto } from './dto/firmware-report.dto';
+import { QueryFirmwareLogDto } from './dto/query-firmware-log.dto';
 import { FirmwareUpdateStatus } from './entities/firmware-update-log.entity';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
@@ -78,11 +79,13 @@ export class FirmwareController {
   @Get('logs')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async getLogs(
-    @Query('deviceId') deviceId?: string,
-    @Query('firmwareId') firmwareId?: string,
-  ) {
-    return this.firmwareService.getUpdateLogs({ deviceId, firmwareId });
+  async getLogs(@Query() query: QueryFirmwareLogDto) {
+    return this.firmwareService.getUpdateLogs({
+      deviceId: query.deviceId,
+      firmwareId: query.firmwareId,
+      page: query.page,
+      limit: query.limit,
+    });
   }
 
   @Get('download/:id')
@@ -125,7 +128,12 @@ export class FirmwareController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   async getDeployStatus(@Param('id') firmwareId: string) {
-    const logs = await this.firmwareService.getUpdateLogs({ firmwareId });
+    // Fetch all logs (high limit) for status counting
+    const result = await this.firmwareService.getUpdateLogs({
+      firmwareId,
+      limit: 1000,
+    });
+    const logs = result.data;
     return {
       firmwareId,
       total: logs.length,

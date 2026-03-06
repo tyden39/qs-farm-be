@@ -1,30 +1,17 @@
-import {
-  IsEnum,
-  IsOptional,
-  IsDateString,
-  IsInt,
-  Min,
-  Max,
-} from 'class-validator';
+import { IsOptional, IsUUID, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { CommandSource } from '../entities/command-log.entity';
 
-export class QueryCommandLogDto {
-  @ApiPropertyOptional({ enum: CommandSource })
+export class QueryFirmwareLogDto {
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsEnum(CommandSource)
-  source?: CommandSource;
+  @IsUUID()
+  deviceId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsDateString()
-  from?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsDateString()
-  to?: string;
+  @IsUUID()
+  firmwareId?: string;
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()

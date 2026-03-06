@@ -234,9 +234,7 @@ export class ProvisionService {
       throw new NotFoundException(`Device not found: ${deviceId}`);
     }
 
-    if (
-      device.status !== DeviceStatus.PAIRED
-    ) {
+    if (device.status !== DeviceStatus.PAIRED) {
       throw new BadRequestException(
         `Cannot regenerate token for device in ${device.status} status`,
       );
