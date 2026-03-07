@@ -104,7 +104,7 @@ export class MqttService implements OnModuleInit {
         timestamp: new Date(),
       };
 
-      this.logger.debug(`Received MQTT message from ${deviceId}:`, payload);
+      // this.logger.debug(`Received MQTT message from ${deviceId}:`, payload);
 
       // Collect matching callbacks (exact match + wildcard pattern match + global '*')
       const matchedCallbacks: Function[] = [];
