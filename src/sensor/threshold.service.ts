@@ -9,6 +9,12 @@ import { AlertLog, AlertDirection } from './entities/alert-log.entity';
 import { CommandLog, CommandSource } from './entities/command-log.entity';
 import { ThresholdLevel } from './enums/threshold-level.enum';
 import { SENSOR_REASON_MAP } from './constants/threshold-rules';
+import { SENSOR_TYPE_LABEL } from './enums/sensor-type.enum';
+
+const THRESHOLD_LEVEL_LABEL: Record<string, string> = {
+  critical: 'Nguy hiểm',
+  warning: 'Cảnh báo',
+};
 import { FcmService } from 'src/notification/fcm.service';
 
 @Injectable()
@@ -169,8 +175,8 @@ export class ThresholdService {
       if (farmId) {
         this.fcmService
           .sendToFarmOwner(farmId, {
-            title: `${threshold.level.toUpperCase()} Alert: ${sensorType}`,
-            body: reason ?? `${sensorType} alert (${direction})`,
+            title: `${THRESHOLD_LEVEL_LABEL[threshold.level] ?? threshold.level}: ${SENSOR_TYPE_LABEL[sensorType] ?? sensorType}`,
+            body: reason ?? `${SENSOR_TYPE_LABEL[sensorType] ?? sensorType} ${direction === AlertDirection.BELOW ? 'dưới mức' : 'vượt mức'}`,
             data: {
               type: 'SENSOR_ALERT',
               deviceId,

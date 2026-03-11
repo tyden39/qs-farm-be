@@ -5,23 +5,27 @@ export const SENSOR_REASON_MAP: Record<
   { belowMin: string; aboveMax: string }
 > = {
   [SensorType.SOIL_MOISTURE]: {
-    belowMin: 'LOW_MOISTURE',
-    aboveMax: 'HIGH_MOISTURE',
+    belowMin: 'Độ ẩm đất thấp',
+    aboveMax: 'Độ ẩm đất cao',
   },
   [SensorType.PUMP_TEMPERATURE]: {
-    belowMin: 'LOW_TEMPERATURE',
-    aboveMax: 'OVER_TEMPERATURE',
+    belowMin: 'Nhiệt độ máy bơm thấp',
+    aboveMax: 'Nhiệt độ máy bơm quá cao',
   },
   [SensorType.WATER_PRESSURE]: {
-    belowMin: 'LOW_PRESSURE',
-    aboveMax: 'HIGH_PRESSURE',
+    belowMin: 'Áp suất nước thấp',
+    aboveMax: 'Áp suất nước cao',
   },
   [SensorType.WATER_FLOW]: {
-    belowMin: 'LOW_FLOW',
-    aboveMax: 'HIGH_FLOW',
+    belowMin: 'Lưu lượng nước thấp',
+    aboveMax: 'Lưu lượng nước cao',
   },
   [SensorType.ELECTRICAL_CURRENT]: {
-    belowMin: 'LOW_CURRENT',
-    aboveMax: 'OVERCURRENT',
+    belowMin: 'Dòng điện thấp',
+    aboveMax: 'Quá dòng điện',
+  },
+  [SensorType.ELECTRICAL_PHASE]: {
+    belowMin: 'Lỗi pha điện',
+    aboveMax: 'Quá điện áp pha',
   },
 };
