@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { DeviceModule } from 'src/device/device.module';
 import { Device } from 'src/device/entities/device.entity';
+import { Farm } from 'src/farm/entities/farm.entity';
 import { SensorConfig } from './entities/sensor-config.entity';
 import { SensorThreshold } from './entities/sensor-threshold.entity';
 import { SensorData } from './entities/sensor-data.entity';
@@ -22,6 +23,7 @@ import { NotificationModule } from 'src/notification/notification.module';
       AlertLog,
       CommandLog,
       Device,
+      Farm,
     ]),
     DeviceModule,
     NotificationModule,

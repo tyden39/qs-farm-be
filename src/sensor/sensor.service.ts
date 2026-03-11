@@ -27,6 +27,7 @@ interface TelemetryEvent {
   deviceId: string;
   payload: any;
   timestamp: Date;
+  farmId?: string;
 }
 
 interface CommandDispatchedEvent {
@@ -95,9 +96,8 @@ export class SensorService {
       // Load configs (cached)
       const configs = await this.getConfigsForDevice(deviceId);
 
-      // Lookup device farmId for FCM notifications
-      const device = await this.deviceRepo.findOne(deviceId);
-      const farmId = device?.farmId;
+      // farmId passed from SyncService via event (no DB query needed)
+      const farmId = event.farmId;
 
       // Evaluate thresholds for each reading
       for (const reading of readings) {

@@ -177,31 +177,61 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
+   * Mobile app subscribes to all device events in a farm
+   */
+  @SubscribeMessage('subscribeToFarm')
+  handleSubscribeToFarm(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { farmId: string },
+  ) {
+    const { farmId } = data;
+    const room = `farm:${farmId}`;
+    client.join(room);
+    this.logger.log(`Client ${client.id} subscribed to farm ${farmId}`);
+    return { event: 'subscribed', data: { farmId, room } };
+  }
+
+  /**
+   * Mobile app unsubscribes from farm events
+   */
+  @SubscribeMessage('unsubscribeFromFarm')
+  handleUnsubscribeFromFarm(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { farmId: string },
+  ) {
+    const { farmId } = data;
+    client.leave(`farm:${farmId}`);
+    this.logger.log(`Client ${client.id} unsubscribed from farm ${farmId}`);
+    return { event: 'unsubscribed', data: { farmId } };
+  }
+
+  /**
    * Broadcast device data update to all subscribed mobile clients
    */
-  broadcastDeviceData(deviceId: string, data: any) {
-    const room = `device:${deviceId}`;
-    this.server.to(room).emit('deviceData', {
-      deviceId,
-      data,
-      timestamp: new Date().toISOString(),
-    });
-
-    this.logger.debug(`Broadcasted data to ${room}:`, data);
+  broadcastDeviceData(deviceId: string, data: any, farmId?: string) {
+    const payload = { deviceId, data, timestamp: new Date().toISOString() };
+    const rooms = [`device:${deviceId}`];
+    if (farmId) rooms.push(`farm:${farmId}`);
+    this.server.to(rooms).emit('deviceData', payload);
+    this.logger.debug(`Broadcasted data to ${rooms.join(', ')}`);
   }
 
   /**
    * Broadcast device status update
    */
-  broadcastDeviceStatus(deviceId: string, status: any) {
-    const room = `device:${deviceId}`;
-    this.server.to(room).emit('deviceStatus', {
-      deviceId,
-      status,
-      timestamp: new Date().toISOString(),
-    });
+  broadcastDeviceStatus(deviceId: string, status: any, farmId?: string) {
+    const payload = { deviceId, status, timestamp: new Date().toISOString() };
+    const rooms = [`device:${deviceId}`];
+    if (farmId) rooms.push(`farm:${farmId}`);
+    this.server.to(rooms).emit('deviceStatus', payload);
+    this.logger.debug(`Broadcasted status to ${rooms.join(', ')}`);
+  }
 
-    this.logger.debug(`Broadcasted status to ${room}:`, status);
+  /**
+   * Check if a user has any active WebSocket connection
+   */
+  isUserConnected(userId: string): boolean {
+    return Array.from(this.connectedClients.values()).includes(userId);
   }
 
   /**

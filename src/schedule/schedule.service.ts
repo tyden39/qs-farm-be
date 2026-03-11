@@ -16,20 +16,44 @@ import { CreateDeviceScheduleDto } from './dto/create-device-schedule.dto';
 import { UpdateDeviceScheduleDto } from './dto/update-device-schedule.dto';
 import { SyncService } from 'src/device/sync/sync.service';
 import { DeviceService } from 'src/device/device.service';
+import { DeviceGateway } from 'src/device/websocket/device.gateway';
 import { FcmService } from 'src/notification/fcm.service';
+import { Farm } from 'src/farm/entities/farm.entity';
 
 @Injectable()
 export class ScheduleService {
   private readonly logger = new Logger(ScheduleService.name);
   private executing = false;
 
+  // farmId → farm owner userId cache (5min TTL)
+  private farmOwnerCache: Map<string, { userId: string; loadedAt: number }> =
+    new Map();
+  private readonly FARM_OWNER_CACHE_TTL = 300_000;
+
   constructor(
     @InjectRepository(DeviceSchedule)
     private readonly scheduleRepository: Repository<DeviceSchedule>,
+    @InjectRepository(Farm)
+    private readonly farmRepo: Repository<Farm>,
     private readonly syncService: SyncService,
     private readonly deviceService: DeviceService,
+    private readonly deviceGateway: DeviceGateway,
     private readonly fcmService: FcmService,
   ) {}
+
+  private async getFarmOwnerId(farmId: string): Promise<string | null> {
+    const cached = this.farmOwnerCache.get(farmId);
+    if (cached && Date.now() - cached.loadedAt < this.FARM_OWNER_CACHE_TTL) {
+      return cached.userId;
+    }
+    const farm = await this.farmRepo.findOne({ where: { id: farmId } });
+    if (!farm) return null;
+    this.farmOwnerCache.set(farmId, {
+      userId: farm.userId,
+      loadedAt: Date.now(),
+    });
+    return farm.userId;
+  }
 
   async findAll(deviceId?: string, farmId?: string) {
     const where: any = {};
@@ -252,19 +276,32 @@ export class ScheduleService {
         : null);
 
     if (farmId) {
-      this.fcmService
-        .sendToFarmOwner(farmId, {
-          title: `Schedule: ${schedule.name}`,
-          body: `Command "${schedule.command}" executed`,
-          data: {
-            type: 'SCHEDULE_EXECUTED',
-            scheduleId: schedule.id,
-            command: schedule.command,
-          },
-        })
-        .catch((err) =>
-          this.logger.error('FCM schedule notification failed:', err.message),
+      const farmOwnerId = await this.getFarmOwnerId(farmId);
+      const isOnline =
+        farmOwnerId && this.deviceGateway.isUserConnected(farmOwnerId);
+
+      if (!isOnline) {
+        this.fcmService
+          .sendToFarmOwner(farmId, {
+            title: `Schedule: ${schedule.name}`,
+            body: `Command "${schedule.command}" executed`,
+            data: {
+              type: 'SCHEDULE_EXECUTED',
+              scheduleId: schedule.id,
+              command: schedule.command,
+            },
+          })
+          .catch((err) =>
+            this.logger.error(
+              'FCM schedule notification failed:',
+              err.message,
+            ),
+          );
+      } else {
+        this.logger.debug(
+          `Skipping FCM for schedule ${schedule.id} — user ${farmOwnerId} is online`,
         );
+      }
     }
   }
 }

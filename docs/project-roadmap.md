@@ -4,7 +4,7 @@
 
 The IoT Farm Management Platform follows a phased development approach, progressing from core infrastructure through IoT integration to production hardening and advanced features. This document tracks project phases, milestones, and planned features.
 
-**Current Status:** Phase 2 Complete + FCM Push Notifications delivered ahead of Phase 4 schedule.
+**Current Status:** Phase 2 Complete + FCM Push Notifications with farm-level subscriptions delivered ahead of Phase 4 schedule.
 
 ## Phase 1: Core Infrastructure (Complete - 100%)
 
@@ -92,8 +92,8 @@ The IoT Farm Management Platform follows a phased development approach, progress
 - EMQX: 2 webhook endpoints (auth, ACL)
 
 ### WebSocket Events
-- `subscribeToDevice`, `unsubscribeFromDevice`, `sendCommand` (client → server)
-- `deviceData`, `deviceStatus`, `deviceAlert`, `deviceProvisioned`, `devicePaired` (server → client)
+- `subscribeToDevice`, `unsubscribeFromDevice`, `subscribeToFarm`, `unsubscribeFromFarm`, `sendCommand` (client → server)
+- `deviceData`, `deviceStatus`, `deviceAlert`, `deviceProvisioned`, `devicePaired` (server → client, broadcast to both device and farm rooms)
 
 ### Success Metrics (Phase 2)
 - ✅ MQTT telemetry ingestion: 1000+ readings/min per device
@@ -184,6 +184,11 @@ The IoT Farm Management Platform follows a phased development approach, progress
   - Sensor threshold alerts → FCM push to farm owner
   - Schedule execution → FCM push to farm owner
   - Auto-cleanup of stale FCM tokens
+- ✅ **Farm-level WebSocket subscriptions** (delivered 2026-03-11)
+  - `subscribeToFarm(farmId)` for multi-device event streaming
+  - Conditional FCM: skip when farm owner has active WebSocket connection
+  - FarmId caching (60s TTL) for reduced DB load
+  - Dual room broadcasts (device + farm) with no duplicate delivery
 - Email alerts on threshold breach
 - SMS alerts (Twilio integration)
 - In-app notifications with notification center
@@ -413,8 +418,9 @@ Phase 1: Core Infrastructure
 
 ---
 
-**Document Version:** 1.1
-**Last Updated:** 2026-03-03
+**Document Version:** 1.2
+**Last Updated:** 2026-03-11
 **Phase 1-2 Status:** Complete
 **Phase 3-5 Status:** Planned (High confidence in Phase 3 timeline)
 **FCM Push:** Delivered early (2026-03-03), ahead of Phase 4 schedule
+**Farm-Level WebSocket:** Delivered (2026-03-11) with conditional FCM optimization

@@ -4,18 +4,19 @@ import { Repository } from 'typeorm';
 
 import { MqttService } from 'src/device/mqtt/mqtt.service';
 import { DeviceGateway } from 'src/device/websocket/device.gateway';
+import { Farm } from 'src/farm/entities/farm.entity';
 import { SensorConfig } from './entities/sensor-config.entity';
 import { AlertLog, AlertDirection } from './entities/alert-log.entity';
 import { CommandLog, CommandSource } from './entities/command-log.entity';
 import { ThresholdLevel } from './enums/threshold-level.enum';
 import { SENSOR_REASON_MAP } from './constants/threshold-rules';
 import { SENSOR_TYPE_LABEL } from './enums/sensor-type.enum';
+import { FcmService } from 'src/notification/fcm.service';
 
 const THRESHOLD_LEVEL_LABEL: Record<string, string> = {
   critical: 'Nguy hiểm',
   warning: 'Cảnh báo',
 };
-import { FcmService } from 'src/notification/fcm.service';
 
 @Injectable()
 export class ThresholdService {
@@ -30,6 +31,11 @@ export class ThresholdService {
   private lastActionTime: Map<string, number> = new Map();
   private readonly COOLDOWN_MS = 30_000;
 
+  // farmId → farm owner userId cache (5min TTL)
+  private farmOwnerCache: Map<string, { userId: string; loadedAt: number }> =
+    new Map();
+  private readonly FARM_OWNER_CACHE_TTL = 300_000;
+
   constructor(
     private readonly mqttService: MqttService,
     private readonly deviceGateway: DeviceGateway,
@@ -38,11 +44,27 @@ export class ThresholdService {
     private readonly alertLogRepo: Repository<AlertLog>,
     @InjectRepository(CommandLog)
     private readonly commandLogRepo: Repository<CommandLog>,
+    @InjectRepository(Farm)
+    private readonly farmRepo: Repository<Farm>,
   ) {}
+
+  private async getFarmOwnerId(farmId: string): Promise<string | null> {
+    const cached = this.farmOwnerCache.get(farmId);
+    if (cached && Date.now() - cached.loadedAt < this.FARM_OWNER_CACHE_TTL) {
+      return cached.userId;
+    }
+    const farm = await this.farmRepo.findOne({ where: { id: farmId } });
+    if (!farm) return null;
+    this.farmOwnerCache.set(farmId, {
+      userId: farm.userId,
+      loadedAt: Date.now(),
+    });
+    return farm.userId;
+  }
 
   async evaluate(
     deviceId: string,
-    farmId: string,
+    farmId: string | undefined,
     config: SensorConfig,
     value: number,
   ) {
@@ -110,7 +132,7 @@ export class ThresholdService {
             value,
             threshold: thresholdValue,
             reason,
-          });
+          }, farmId);
 
           await this.commandLogRepo.save(
             this.commandLogRepo.create({
@@ -171,24 +193,38 @@ export class ThresholdService {
       });
       await this.alertLogRepo.save(alertLog);
 
-      // Push notification via FCM
+      // Push notification via FCM — only when user is offline
       if (farmId) {
-        this.fcmService
-          .sendToFarmOwner(farmId, {
-            title: `${THRESHOLD_LEVEL_LABEL[threshold.level] ?? threshold.level}: ${SENSOR_TYPE_LABEL[sensorType] ?? sensorType}`,
-            body: reason ?? `${SENSOR_TYPE_LABEL[sensorType] ?? sensorType} ${direction === AlertDirection.BELOW ? 'dưới mức' : 'vượt mức'}`,
-            data: {
-              type: 'SENSOR_ALERT',
-              deviceId,
-              sensorType,
-              level: threshold.level,
-              alertLogId: alertLog.id,
-            },
-          })
-          .catch((err) => this.logger.error('FCM alert failed:', err.message));
+        const farmOwnerId = await this.getFarmOwnerId(farmId);
+        const isOnline =
+          farmOwnerId && this.deviceGateway.isUserConnected(farmOwnerId);
+
+        if (!isOnline) {
+          this.fcmService
+            .sendToFarmOwner(farmId, {
+              title: `${THRESHOLD_LEVEL_LABEL[threshold.level] ?? threshold.level}: ${SENSOR_TYPE_LABEL[sensorType] ?? sensorType}`,
+              body:
+                reason ??
+                `${SENSOR_TYPE_LABEL[sensorType] ?? sensorType} ${direction === AlertDirection.BELOW ? 'dưới mức' : 'vượt mức'}`,
+              data: {
+                type: 'SENSOR_ALERT',
+                deviceId,
+                sensorType,
+                level: threshold.level,
+                alertLogId: alertLog.id,
+              },
+            })
+            .catch((err) =>
+              this.logger.error('FCM alert failed:', err.message),
+            );
+        } else {
+          this.logger.debug(
+            `Skipping FCM for ${deviceId} — user ${farmOwnerId} is online`,
+          );
+        }
       }
 
-      // Broadcast alert to WebSocket
+      // Broadcast alert to WebSocket (device + farm rooms)
       this.deviceGateway.broadcastDeviceData(deviceId, {
         type: 'alert',
         sensorType,
@@ -198,7 +234,7 @@ export class ThresholdService {
         direction,
         action: threshold.action,
         reason,
-      });
+      }, farmId);
 
       this.logger.log(
         `Alert: ${sensorType} ${direction} ${thresholdValue} (value=${value}, level=${threshold.level}, action=${threshold.action})`,

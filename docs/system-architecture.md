@@ -128,16 +128,19 @@
 │  │  │         - device/+/status                              │  │
 │  │  │         - device/+/resp                                │  │
 │  │  │         - provision/*                                  │  │
+│  │  │       • Caches farmId (60s TTL) to enable farm-level   │  │
+│  │  │         broadcasts without redundant DB queries        │  │
 │  │  │       • Emits domain events:                           │  │
-│  │  │         - telemetry.received                           │  │
+│  │  │         - telemetry.received (includes farmId)         │  │
 │  │  │         - command.dispatched                           │  │
-│  │  │       • Broadcasts to WebSocket rooms                  │  │
+│  │  │       • Broadcasts to WebSocket rooms (device + farm)  │  │
 │  │  │                                                         │  │
 │  │  ├── DeviceGateway                                         │  │
 │  │  │   └── Socket.IO namespace /device                      │  │
 │  │  │       • JWT auth on handshake                          │  │
-│  │  │       • Room management (device:{id})                  │  │
-│  │  │       • Events: subscribeToDevice, sendCommand         │  │
+│  │  │       • Room management (device:{id}, farm:{id})       │  │
+│  │  │       • Events: subscribeToDevice/Farm, sendCommand    │  │
+│  │  │       • User connection tracking for FCM optimization  │  │
 │  │  │                                                         │  │
 │  │  ├── DeviceService (CRUD, status, token mgmt)             │  │
 │  │  ├── Device entity (UUID PK, farm FK, status enum)        │  │
@@ -164,7 +167,7 @@
 │  │  │   ├── Anti-spam: 30s cooldown per sensor               │  │
 │  │  │   ├── Publishes command to device via SyncService      │  │
 │  │  │   ├── Broadcasts alert via DeviceGateway               │  │
-│  │  │   ├── Sends FCM push via FcmService (fire-and-forget)  │  │
+│  │  │   ├── Conditional FCM: skip if farm owner online (WS)  │  │
 │  │  │   └── Logs to CommandLog (source: AUTOMATED)           │  │
 │  │  │                                                         │  │
 │  │  ├── SensorConfig entity (deviceId, sensorType unique)    │  │
@@ -187,7 +190,7 @@
 │  │  │   ├── Farm-wide or single-device targeting             │  │
 │  │  │   ├── Auto-disable after one-time execution            │  │
 │  │  │   ├── Catches up missed executions on restart          │  │
-│  │  │   ├── Sends FCM push via FcmService after execution    │  │
+│  │  │   ├── Conditional FCM: skip if farm owner online (WS)  │  │
 │  │  │   └── Publishes via SyncService.sendCommandToDevice()  │  │
 │  │  │                                                         │  │
 │  │  ├── DeviceSchedule entity (recurring + one-time)         │  │
@@ -419,12 +422,15 @@
 
 4. SyncService listener processes telemetry event:
    - Validates device exists and status = ACTIVE
-   - Emits domain event: 'telemetry.received'
+   - Caches farmId (60s TTL) to enable farm-level broadcasts
+   - Broadcasts via DeviceGateway to device:{deviceId} + farm:{farmId} rooms
+   - Emits domain event: 'telemetry.received' (includes farmId)
    - Time: ~10-50ms
 
 5. SensorService @OnEvent('telemetry.received') listener:
    - Inserts reading into SensorData table
    - Retrieves SensorConfig from cache (60s TTL)
+   - Uses farmId from event (no Device query needed)
    - Calls ThresholdService.evaluate()
    - Time: ~50-100ms
 
@@ -434,14 +440,14 @@
    - If threshold breached:
      a) Publishes command to device/+/cmd via MqttService
      b) Creates CommandLog entry (source: AUTOMATED)
-     c) Broadcasts alert via DeviceGateway.io.to('device:{id}').emit('deviceAlert')
-     d) Sends FCM push to farm owner via FcmService.sendToFarmOwner() (fire-and-forget)
+     c) Broadcasts alert via DeviceGateway to device:{id} + farm:{farmId} rooms
+     d) Sends FCM only if farm owner is NOT online (WS check via DeviceGateway)
    - Always creates AlertLog entry
    - Time: ~30-80ms
 
 7. DeviceGateway broadcasts telemetry to all subscribers:
-   - Emits 'deviceData' to room device:{deviceId}
-   - All connected WebSocket clients receive update
+   - Emits 'deviceData' to rooms: device:{deviceId} + farm:{farmId}
+   - All connected WebSocket clients receive update once (Socket.IO union)
    - Time: ~20-50ms
 
 Total latency: Device → Database: ~100-150ms
@@ -561,7 +567,7 @@ ScheduleService @Interval(60_000):
    - Emit 'command.dispatched' event
    - Update lastExecutedAt timestamp
    - For one-time: set enabled = false
-   - Send FCM push to farm owner via FcmService.sendToFarmOwner() (fire-and-forget)
+   - Send FCM only if farm owner is NOT online (WS check via DeviceGateway)
    - Time per schedule: ~20-50ms
 
 5. executing = false (release lock)
@@ -614,6 +620,15 @@ Event: unsubscribeFromDevice
 Payload: { deviceId: string }
 Action: Client leaves room 'device:{deviceId}'
 
+Event: subscribeToFarm
+Payload: { farmId: string }
+Action: Client joins room 'farm:{farmId}'
+Effect: Client receives ALL device events (telemetry, status, alerts) from all devices in farm
+
+Event: unsubscribeFromFarm
+Payload: { farmId: string }
+Action: Client leaves room 'farm:{farmId}'
+
 Event: sendCommand
 Payload: { deviceId: string, command: string, params?: any }
 Action: Calls DeviceService.sendCommand()
@@ -624,19 +639,20 @@ Server → Client:
 ────────────────
 
 Event: deviceData
-Broadcast to: device:{deviceId} room
+Broadcast to: device:{deviceId} + farm:{farmId} rooms
 Payload: { deviceId: string, sensorType: string, value: number, timestamp: date }
 Trigger: SyncService receives telemetry on device/+/telemetry
 Latency: < 100ms after MQTT message
+Note: Clients in both rooms receive once (Socket.IO union logic)
 
 Event: deviceStatus
-Broadcast to: device:{deviceId} room
+Broadcast to: device:{deviceId} + farm:{farmId} rooms
 Payload: { deviceId: string, status: enum, battery?: number, signal?: number }
 Trigger: SyncService receives message on device/+/status
 Latency: < 100ms
 
 Event: deviceAlert
-Broadcast to: device:{deviceId} room
+Broadcast to: device:{deviceId} + farm:{farmId} rooms
 Payload: { deviceId: string, sensorType: string, level: enum, value: number, threshold: number, action: string }
 Trigger: ThresholdService breaches threshold
 Latency: < 200ms after threshold detection
@@ -815,6 +831,6 @@ Trigger: ProvisionService.pairDevice()
 
 ---
 
-**Document Version:** 1.1
-**Last Updated:** 2026-03-03
-**Architecture Pattern:** NestJS 8 with MQTT + WebSocket dual transport + FCM push notifications
+**Document Version:** 1.2
+**Last Updated:** 2026-03-11
+**Architecture Pattern:** NestJS 8 with MQTT + WebSocket dual transport + FCM push notifications + Farm-level subscriptions

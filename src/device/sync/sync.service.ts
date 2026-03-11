@@ -1,8 +1,11 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttService, MqttMessage } from '../mqtt/mqtt.service';
 import { DeviceGateway } from '../websocket/device.gateway';
 import { ProvisionService } from 'src/provision/provision.service';
+import { Device } from '../entities/device.entity';
 
 /**
  * Sync Service - Bridge between MQTT (devices) and WebSocket (mobile apps)
@@ -11,11 +14,18 @@ import { ProvisionService } from 'src/provision/provision.service';
 export class SyncService implements OnModuleInit {
   private readonly logger = new Logger(SyncService.name);
 
+  // deviceId → farmId cache (60s TTL)
+  private farmIdCache: Map<string, { farmId: string | null; loadedAt: number }> =
+    new Map();
+  private readonly FARM_CACHE_TTL = 60_000;
+
   constructor(
     private readonly mqttService: MqttService,
     private readonly deviceGateway: DeviceGateway,
     private readonly provisionService: ProvisionService,
     private readonly eventEmitter: EventEmitter2,
+    @InjectRepository(Device)
+    private readonly deviceRepo: Repository<Device>,
   ) {}
 
   onModuleInit() {
@@ -34,17 +44,23 @@ export class SyncService implements OnModuleInit {
 
     // Listen to device status messages
     this.mqttService.onMessage('device/+/status', (message: MqttMessage) => {
-      this.handleDeviceStatus(message);
+      this.handleDeviceStatus(message).catch((err) =>
+        this.logger.error(`Error handling status from ${message.deviceId}:`, err),
+      );
     });
 
     // Listen to device telemetry
     this.mqttService.onMessage('device/+/telemetry', (message: MqttMessage) => {
-      this.handleDeviceTelemetry(message);
+      this.handleDeviceTelemetry(message).catch((err) =>
+        this.logger.error(`Error handling telemetry from ${message.deviceId}:`, err),
+      );
     });
 
     // Listen to device responses
     this.mqttService.onMessage('device/+/resp', (message: MqttMessage) => {
-      this.handleDeviceResponse(message);
+      this.handleDeviceResponse(message).catch((err) =>
+        this.logger.error(`Error handling response from ${message.deviceId}:`, err),
+      );
     });
 
     this.logger.log('MQTT to WebSocket sync enabled');
@@ -74,56 +90,74 @@ export class SyncService implements OnModuleInit {
     }
   }
 
+  private async getFarmId(deviceId: string): Promise<string | null> {
+    const cached = this.farmIdCache.get(deviceId);
+    if (cached && Date.now() - cached.loadedAt < this.FARM_CACHE_TTL) {
+      return cached.farmId;
+    }
+    const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
+    const farmId = device?.farmId ?? null;
+    this.farmIdCache.set(deviceId, { farmId, loadedAt: Date.now() });
+    return farmId;
+  }
+
   /**
    * Handle incoming device status update
    */
-  private handleDeviceStatus(message: MqttMessage) {
-    const { deviceId, topic, payload, timestamp } = message;
+  private async handleDeviceStatus(message: MqttMessage) {
+    const { deviceId, payload, timestamp } = message;
 
     this.logger.debug(`Processing device status from ${deviceId}`);
+
+    const farmId = await this.getFarmId(deviceId);
 
     this.deviceGateway.broadcastDeviceStatus(deviceId, {
       ...payload,
       receivedAt: timestamp,
-    });
+    }, farmId);
   }
 
   /**
    * Handle incoming device telemetry
    */
-  private handleDeviceTelemetry(message: MqttMessage) {
-    const { deviceId, topic, payload, timestamp } = message;
+  private async handleDeviceTelemetry(message: MqttMessage) {
+    const { deviceId, payload, timestamp } = message;
 
     this.logger.debug(`Processing telemetry from ${deviceId}`);
+
+    const farmId = await this.getFarmId(deviceId);
 
     this.deviceGateway.broadcastDeviceData(deviceId, {
       type: 'telemetry',
       ...payload,
       receivedAt: timestamp,
-    });
+    }, farmId);
 
     this.eventEmitter.emit('telemetry.received', {
       deviceId,
       payload,
       timestamp,
+      farmId,
     });
   }
 
   /**
    * Handle device response to command
    */
-  private handleDeviceResponse(message: MqttMessage) {
-    const { deviceId, topic, payload, timestamp } = message;
+  private async handleDeviceResponse(message: MqttMessage) {
+    const { deviceId, payload, timestamp } = message;
 
     this.logger.log(
       `Device response from ${deviceId}: command=${payload.command} success=${payload.success}`,
     );
 
+    const farmId = await this.getFarmId(deviceId);
+
     this.deviceGateway.broadcastDeviceStatus(deviceId, {
       type: 'commandResponse',
       ...payload,
       receivedAt: timestamp,
-    });
+    }, farmId);
 
     // Detect firmware OTA_UPDATE response
     if (payload.command === 'OTA_UPDATE') {
@@ -148,6 +182,8 @@ export class SyncService implements OnModuleInit {
   async sendCommandToDevice(deviceId: string, command: string, params: any) {
     this.logger.log(`Sending command to device ${deviceId}: ${command}`);
 
+    const farmId = await this.getFarmId(deviceId);
+
     try {
       await this.mqttService.publishToDevice(deviceId, command, params);
 
@@ -156,7 +192,7 @@ export class SyncService implements OnModuleInit {
         type: 'commandSent',
         command,
         timestamp: new Date().toISOString(),
-      });
+      }, farmId);
 
       this.eventEmitter.emit('command.dispatched', {
         deviceId,
@@ -178,7 +214,7 @@ export class SyncService implements OnModuleInit {
         command,
         error: error.message,
         timestamp: new Date().toISOString(),
-      });
+      }, farmId);
 
       this.eventEmitter.emit('command.dispatched', {
         deviceId,
