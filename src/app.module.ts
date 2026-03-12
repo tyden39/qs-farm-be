@@ -16,6 +16,7 @@ import { SensorModule } from './sensor/sensor.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { FirmwareModule } from './firmware/firmware.module';
 import { NotificationModule } from './notification/notification.module';
+import { CoffeePriceModule } from './coffee-price/coffee-price.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { NotificationModule } from './notification/notification.module';
     ScheduleModule,
     FirmwareModule,
     NotificationModule,
+    CoffeePriceModule,
   ],
   providers: [],
 })
