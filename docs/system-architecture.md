@@ -258,6 +258,30 @@
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
+│  │ Coffee Price Module (Market Intelligence)                  │  │
+│  │  ├── imports: none                                         │  │
+│  │  │                                                         │  │
+│  │  ├── CoffeePriceService                                   │  │
+│  │  │   ├── @Cron('0 0 * * *', timezone: 'Asia/Ho_Chi_Minh')│  │
+│  │  │   ├── Daily web scrape of giacaphe.com prices         │  │
+│  │  │   ├── Puppeteer v19 (headless + Cloudflare handler)  │  │
+│  │  │   ├── Cheerio parsing for table extraction           │  │
+│  │  │   ├── 3-retry logic (immediate, +30s, +60s delays)   │  │
+│  │  │   ├── Stores 7 Vietnamese coffee markets             │  │
+│  │  │   ├── findAll(filter: market/date/limit, max 365)    │  │
+│  │  │   └── findLatest() - most recent date's prices        │  │
+│  │  │                                                         │  │
+│  │  ├── CoffeePriceController                                │  │
+│  │  │   ├── GET /api/coffee-price (with query filters)      │  │
+│  │  │   └── GET /api/coffee-price/latest (JWT protected)   │  │
+│  │  │                                                         │  │
+│  │  ├── CoffeePrice entity (UUID PK, UNIQUE(date,market))  │  │
+│  │  ├── CoffeeMarket enum (7 markets + labels)             │  │
+│  │  └── QueryCoffeePriceDto (market, from, to, limit)      │  │
+│  │                                                         │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                   │
+│  ┌────────────────────────────────────────────────────────────┐  │
 │  │ Files Module (Upload & Storage)                            │  │
 │  │  ├── FilesService (Multer disk storage)                   │  │
 │  │  ├── File entity (metadata)                               │  │
@@ -405,6 +429,19 @@
 │   | ANDROID)             │
 │ createdAt                │
 │ updatedAt                │
+└──────────────────────────┘
+
+┌──────────────────────────┐
+│ CoffeePrice              │
+├──────────────────────────┤
+│ id: UUID (PK)            │
+│ date: date               │
+│ market: enum (7 mkts)    │
+│ price: float             │
+│ currency: str (VND)      │
+│ unit: str (kg)           │
+│ unique(date, market)     │
+│ createdAt                │
 └──────────────────────────┘
 ```
 
@@ -831,6 +868,6 @@ Trigger: ProvisionService.pairDevice()
 
 ---
 
-**Document Version:** 1.2
-**Last Updated:** 2026-03-11
-**Architecture Pattern:** NestJS 8 with MQTT + WebSocket dual transport + FCM push notifications + Farm-level subscriptions
+**Document Version:** 1.3
+**Last Updated:** 2026-03-12
+**Architecture Pattern:** NestJS 8 with MQTT + WebSocket dual transport + FCM push notifications + Farm-level subscriptions + Coffee price intelligence

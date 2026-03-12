@@ -4,7 +4,7 @@
 
 The IoT Farm Management Platform follows a phased development approach, progressing from core infrastructure through IoT integration to production hardening and advanced features. This document tracks project phases, milestones, and planned features.
 
-**Current Status:** Phase 2 Complete + FCM Push Notifications with farm-level subscriptions delivered ahead of Phase 4 schedule.
+**Current Status:** Phase 2 Complete + Advanced Features (FCM, Farm-level subscriptions, Coffee price intelligence) delivered ahead of Phase 4 schedule.
 
 ## Phase 1: Core Infrastructure (Complete - 100%)
 
@@ -189,6 +189,14 @@ The IoT Farm Management Platform follows a phased development approach, progress
   - Conditional FCM: skip when farm owner has active WebSocket connection
   - FarmId caching (60s TTL) for reduced DB load
   - Dual room broadcasts (device + farm) with no duplicate delivery
+- ✅ **Coffee price market intelligence** (delivered 2026-03-12)
+  - Daily automated scraping from giacaphe.com (7 Vietnamese markets)
+  - Puppeteer v19 with Cloudflare protection handling
+  - Cheerio HTML parsing for reliable data extraction
+  - 3-retry logic with exponential delays (immediate, +30s, +60s)
+  - CoffeePrice entity with UNIQUE(date, market) constraint
+  - REST endpoints: `GET /api/coffee-price` (filtered) + `GET /api/coffee-price/latest`
+  - Max 365-day query range, JWT-protected access
 - Email alerts on threshold breach
 - SMS alerts (Twilio integration)
 - In-app notifications with notification center
@@ -235,6 +243,8 @@ The IoT Farm Management Platform follows a phased development approach, progress
 
 ### Success Criteria
 - [x] FCM push notifications delivered to mobile app on alert/schedule
+- [x] Coffee price data updated daily at midnight Vietnam time
+- [x] Coffee price scrape succeeds with 3-retry fallback
 - [ ] Email notifications sent < 5 seconds after alert
 - [ ] Analytics dashboards load in < 2 seconds
 - [ ] Mobile app achieves > 4.5 star rating
@@ -323,7 +333,9 @@ Phase 1: Core Infrastructure
        ├─ Command Scheduling ✅
        ├─ Command Logging ✅
        ├─ EMQX Integration ✅
-       └─ FCM Push Notifications ✅ (early delivery)
+       ├─ FCM Push Notifications ✅ (early delivery)
+       ├─ Farm-Level WebSocket ✅ (early delivery)
+       └─ Coffee Price Intelligence ✅ (early delivery)
           │
           └─→ Phase 3: Production Hardening
               │
@@ -418,9 +430,10 @@ Phase 1: Core Infrastructure
 
 ---
 
-**Document Version:** 1.2
-**Last Updated:** 2026-03-11
+**Document Version:** 1.3
+**Last Updated:** 2026-03-12
 **Phase 1-2 Status:** Complete
 **Phase 3-5 Status:** Planned (High confidence in Phase 3 timeline)
 **FCM Push:** Delivered early (2026-03-03), ahead of Phase 4 schedule
 **Farm-Level WebSocket:** Delivered (2026-03-11) with conditional FCM optimization
+**Coffee Price Intelligence:** Delivered (2026-03-12) with 3-retry scraping and daily scheduling
