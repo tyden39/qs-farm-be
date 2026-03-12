@@ -124,15 +124,19 @@ export class ThresholdService {
             threshold: thresholdValue,
           });
 
-          this.deviceGateway.broadcastDeviceData(deviceId, {
-            type: 'command_dispatched',
-            command: threshold.action,
-            sensorType,
-            level: threshold.level,
-            value,
-            threshold: thresholdValue,
-            reason,
-          }, farmId);
+          this.deviceGateway.broadcastDeviceData(
+            deviceId,
+            {
+              type: 'command_dispatched',
+              command: threshold.action,
+              sensorType,
+              level: threshold.level,
+              value,
+              threshold: thresholdValue,
+              reason,
+            },
+            farmId,
+          );
 
           await this.commandLogRepo.save(
             this.commandLogRepo.create({
@@ -202,10 +206,14 @@ export class ThresholdService {
         if (!isOnline) {
           this.fcmService
             .sendToFarmOwner(farmId, {
-              title: `${THRESHOLD_LEVEL_LABEL[threshold.level] ?? threshold.level}: ${SENSOR_TYPE_LABEL[sensorType] ?? sensorType}`,
+              title: `${
+                THRESHOLD_LEVEL_LABEL[threshold.level] ?? threshold.level
+              }: ${SENSOR_TYPE_LABEL[sensorType] ?? sensorType}`,
               body:
                 reason ??
-                `${SENSOR_TYPE_LABEL[sensorType] ?? sensorType} ${direction === AlertDirection.BELOW ? 'dưới mức' : 'vượt mức'}`,
+                `${SENSOR_TYPE_LABEL[sensorType] ?? sensorType} ${
+                  direction === AlertDirection.BELOW ? 'dưới mức' : 'vượt mức'
+                }`,
               data: {
                 type: 'SENSOR_ALERT',
                 deviceId,
@@ -225,16 +233,20 @@ export class ThresholdService {
       }
 
       // Broadcast alert to WebSocket (device + farm rooms)
-      this.deviceGateway.broadcastDeviceData(deviceId, {
-        type: 'alert',
-        sensorType,
-        value,
-        threshold: thresholdValue,
-        level: threshold.level,
-        direction,
-        action: threshold.action,
-        reason,
-      }, farmId);
+      this.deviceGateway.broadcastDeviceData(
+        deviceId,
+        {
+          type: 'alert',
+          sensorType,
+          value,
+          threshold: thresholdValue,
+          level: threshold.level,
+          direction,
+          action: threshold.action,
+          reason,
+        },
+        farmId,
+      );
 
       this.logger.log(
         `Alert: ${sensorType} ${direction} ${thresholdValue} (value=${value}, level=${threshold.level}, action=${threshold.action})`,

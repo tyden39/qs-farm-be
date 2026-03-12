@@ -292,10 +292,7 @@ export class ScheduleService {
             },
           })
           .catch((err) =>
-            this.logger.error(
-              'FCM schedule notification failed:',
-              err.message,
-            ),
+            this.logger.error('FCM schedule notification failed:', err.message),
           );
       } else {
         this.logger.debug(

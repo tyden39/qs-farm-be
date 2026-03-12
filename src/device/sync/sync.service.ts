@@ -15,8 +15,10 @@ export class SyncService implements OnModuleInit {
   private readonly logger = new Logger(SyncService.name);
 
   // deviceId → farmId cache (60s TTL)
-  private farmIdCache: Map<string, { farmId: string | null; loadedAt: number }> =
-    new Map();
+  private farmIdCache: Map<
+    string,
+    { farmId: string | null; loadedAt: number }
+  > = new Map();
   private readonly FARM_CACHE_TTL = 60_000;
 
   constructor(
@@ -45,21 +47,30 @@ export class SyncService implements OnModuleInit {
     // Listen to device status messages
     this.mqttService.onMessage('device/+/status', (message: MqttMessage) => {
       this.handleDeviceStatus(message).catch((err) =>
-        this.logger.error(`Error handling status from ${message.deviceId}:`, err),
+        this.logger.error(
+          `Error handling status from ${message.deviceId}:`,
+          err,
+        ),
       );
     });
 
     // Listen to device telemetry
     this.mqttService.onMessage('device/+/telemetry', (message: MqttMessage) => {
       this.handleDeviceTelemetry(message).catch((err) =>
-        this.logger.error(`Error handling telemetry from ${message.deviceId}:`, err),
+        this.logger.error(
+          `Error handling telemetry from ${message.deviceId}:`,
+          err,
+        ),
       );
     });
 
     // Listen to device responses
     this.mqttService.onMessage('device/+/resp', (message: MqttMessage) => {
       this.handleDeviceResponse(message).catch((err) =>
-        this.logger.error(`Error handling response from ${message.deviceId}:`, err),
+        this.logger.error(
+          `Error handling response from ${message.deviceId}:`,
+          err,
+        ),
       );
     });
 
@@ -111,10 +122,14 @@ export class SyncService implements OnModuleInit {
 
     const farmId = await this.getFarmId(deviceId);
 
-    this.deviceGateway.broadcastDeviceStatus(deviceId, {
-      ...payload,
-      receivedAt: timestamp,
-    }, farmId);
+    this.deviceGateway.broadcastDeviceStatus(
+      deviceId,
+      {
+        ...payload,
+        receivedAt: timestamp,
+      },
+      farmId,
+    );
   }
 
   /**
@@ -127,11 +142,15 @@ export class SyncService implements OnModuleInit {
 
     const farmId = await this.getFarmId(deviceId);
 
-    this.deviceGateway.broadcastDeviceData(deviceId, {
-      type: 'telemetry',
-      ...payload,
-      receivedAt: timestamp,
-    }, farmId);
+    this.deviceGateway.broadcastDeviceData(
+      deviceId,
+      {
+        type: 'telemetry',
+        ...payload,
+        receivedAt: timestamp,
+      },
+      farmId,
+    );
 
     this.eventEmitter.emit('telemetry.received', {
       deviceId,
@@ -153,11 +172,15 @@ export class SyncService implements OnModuleInit {
 
     const farmId = await this.getFarmId(deviceId);
 
-    this.deviceGateway.broadcastDeviceStatus(deviceId, {
-      type: 'commandResponse',
-      ...payload,
-      receivedAt: timestamp,
-    }, farmId);
+    this.deviceGateway.broadcastDeviceStatus(
+      deviceId,
+      {
+        type: 'commandResponse',
+        ...payload,
+        receivedAt: timestamp,
+      },
+      farmId,
+    );
 
     // Detect firmware OTA_UPDATE response
     if (payload.command === 'OTA_UPDATE') {
@@ -188,11 +211,15 @@ export class SyncService implements OnModuleInit {
       await this.mqttService.publishToDevice(deviceId, command, params);
 
       // Notify mobile app that command was sent
-      this.deviceGateway.broadcastDeviceStatus(deviceId, {
-        type: 'commandSent',
-        command,
-        timestamp: new Date().toISOString(),
-      }, farmId);
+      this.deviceGateway.broadcastDeviceStatus(
+        deviceId,
+        {
+          type: 'commandSent',
+          command,
+          timestamp: new Date().toISOString(),
+        },
+        farmId,
+      );
 
       this.eventEmitter.emit('command.dispatched', {
         deviceId,
@@ -209,12 +236,16 @@ export class SyncService implements OnModuleInit {
       this.logger.error(`Failed to send command to device ${deviceId}:`, error);
 
       // Notify mobile app of error
-      this.deviceGateway.broadcastDeviceStatus(deviceId, {
-        type: 'commandFailed',
-        command,
-        error: error.message,
-        timestamp: new Date().toISOString(),
-      }, farmId);
+      this.deviceGateway.broadcastDeviceStatus(
+        deviceId,
+        {
+          type: 'commandFailed',
+          command,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        },
+        farmId,
+      );
 
       this.eventEmitter.emit('command.dispatched', {
         deviceId,
