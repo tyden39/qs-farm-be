@@ -8,6 +8,8 @@ services:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASS}
       POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
       interval: 10s
@@ -46,17 +48,32 @@ services:
   nest-backend:
     image: ghcr.io/tyden39/qs-farm-be:latest
     restart: always
-    volumes:
-      # Map: [Local Path] : [Container Path]
-      - ./qs-farm-test-firebase-adminsdk-fbsvc-12c9996b25.json:/app/service-account.json
     env_file:
       - .env
+    environment:
+      DB_HOST: db
+      MQTT_BROKER_URL: mqtt://emqx:1883
+      EMQX_DASHBOARD_URL: http://emqx:18083
+      NODE_ENV: production
+    volumes:
+      - ./qs-farm-test-firebase-adminsdk-fbsvc-12c9996b25.json:/app/service-account.json:ro
+      - app-files:/app/files
     ports:
       - "3040:3000"
     depends_on:
-      - db
-      - emqx
+      db:
+        condition: service_healthy
+      emqx:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/api', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
+  pg-data:
   emqx-data:
   emqx-log:
+  app-files:

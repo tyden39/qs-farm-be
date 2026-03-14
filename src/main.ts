@@ -14,11 +14,6 @@ async function bootstrap() {
     type: VersioningType.URI,
   });
 
-  app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
-    credentials: true,
-  });
-
   app.use(cookieParser());
 
   app.useGlobalPipes(
