@@ -2,6 +2,49 @@
 
 All notable changes to the IoT Farm Management Platform are documented in this file.
 
+## Version 1.4 (2026-03-16)
+
+### Added: Pump Session Tracking & Maintenance Monitoring
+
+**Feature:** Real-time pump operation tracking with lifecycle events and maintenance insights
+
+- **New Module:** PumpModule with service, controller, entity, enums
+- **Session Lifecycle:** Event-driven tracking via `pump.started`, `pump.stopped`, `pump.disconnected` events
+- **New Entity:** PumpSession - captures pump on/off cycles with sensor aggregates
+- **Enums:**
+  - `PumpSessionStatus`: active, completed, interrupted
+  - `InterruptedReason`: lost_will_topic (lwt), esp_reboot, timeout
+- **Device Enhancements:** Added `operatingLifeHours`, `totalOperatingHours` fields to Device entity
+- **SensorType Enhancement:** Added `PUMP_STATUS` enum value
+- **MQTT Session Handshake:** Server publishes sessionId to `device/{id}/session` for session identification
+- **Stale Session Management:** @Interval(60s) cron closes sessions with no data >30s (prevents hanging states)
+- **Report API:**
+  - `GET /api/pump/report/:deviceId` - JSON report (summary, maintenance info, timeline, sessions)
+  - `GET /api/pump/report/:deviceId?format=excel` - Excel export via exceljs
+- **Report Contents:**
+  - Summary: cycle count, operating hours, last session
+  - Maintenance alerts: based on runtime thresholds
+  - Timeline: chronological session events
+  - Sessions list: detailed session data with interruption reasons
+- **Dependencies Added:** exceljs@4.x
+
+**Files Created:**
+- `src/pump/pump.module.ts`
+- `src/pump/pump.service.ts`
+- `src/pump/pump.controller.ts`
+- `src/pump/entities/pump-session.entity.ts`
+- `src/pump/enums/pump-session-status.enum.ts`
+- `src/pump/enums/interrupted-reason.enum.ts`
+
+**Technical Highlights:**
+- Event-driven session lifecycle with automatic cleanup
+- JSONB storage of sensor aggregates for rich session context
+- Timezone-agnostic UTC timestamps for session tracking
+- Excel export with formatted tables and summaries
+- Auto-closing stale sessions prevents orphaned records
+
+---
+
 ## Version 1.3 (2026-03-12)
 
 ### Added: Coffee Price Intelligence Module

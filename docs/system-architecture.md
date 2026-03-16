@@ -258,6 +258,33 @@
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
+│  │ Pump Module (Session Tracking & Maintenance)               │  │
+│  │  ├── imports: DeviceModule                                │  │
+│  │  │                                                         │  │
+│  │  ├── PumpService                                           │  │
+│  │  │   ├── startSession(deviceId, sensorData)              │  │
+│  │  │   ├── stopSession(deviceId, status, reason)           │  │
+│  │  │   ├── @OnEvent('pump.started', 'pump.stopped', etc)  │  │
+│  │  │   ├── @Interval(60_000) closeStaleSession             │  │
+│  │  │   │   └── Closes sessions with no data > 30s          │  │
+│  │  │   ├── getReport(deviceId) - summary + timeline        │  │
+│  │  │   ├── exportToExcel(deviceId) - via exceljs          │  │
+│  │  │   ├── Tracks cycles: running hours, cycles count      │  │
+│  │  │   └── Maintenance alerts based on thresholds          │  │
+│  │  │                                                         │  │
+│  │  ├── PumpController                                        │  │
+│  │  │   ├── GET /api/pump/report/:deviceId (JSON)          │  │
+│  │  │   └── GET /api/pump/report/:deviceId?format=excel    │  │
+│  │  │                                                         │  │
+│  │  ├── PumpSession entity (tracking pump cycles)           │  │
+│  │  ├── PumpSessionStatus enum (active/completed/interruped)│  │
+│  │  ├── InterruptedReason enum (lwt/esp_reboot/timeout)    │  │
+│  │  └── Event-driven: pump.started, pump.stopped,          │  │
+│  │      pump.disconnected                                    │  │
+│  │                                                         │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                   │
+│  ┌────────────────────────────────────────────────────────────┐  │
 │  │ Coffee Price Module (Market Intelligence)                  │  │
 │  │  ├── imports: none                                         │  │
 │  │  │                                                         │  │
@@ -330,6 +357,8 @@
 │ status: enum                     │
 │ deviceToken: str                 │
 │ farmId: UUID (FK)                │
+│ operatingLifeHours: float        │
+│ totalOperatingHours: float       │
 │ provisionedAt, pairedAt          │
 │ createdAt, updatedAt             │
 └────────┬─────────────────────────┘
@@ -429,6 +458,20 @@
 │   | ANDROID)             │
 │ createdAt                │
 │ updatedAt                │
+└──────────────────────────┘
+
+┌──────────────────────────┐
+│ PumpSession              │
+├──────────────────────────┤
+│ id: UUID (PK)            │
+│ deviceId: UUID (FK)      │
+│ sessionId: str (MQTT)    │
+│ status: enum (active)    │
+│ startedAt: timestamp     │
+│ stoppedAt: timestamp     │
+│ interruptedReason: enum  │
+│ sensorAggregates: JSONB  │
+│ createdAt, updatedAt     │
 └──────────────────────────┘
 
 ┌──────────────────────────┐
@@ -868,6 +911,6 @@ Trigger: ProvisionService.pairDevice()
 
 ---
 
-**Document Version:** 1.3
-**Last Updated:** 2026-03-12
-**Architecture Pattern:** NestJS 8 with MQTT + WebSocket dual transport + FCM push notifications + Farm-level subscriptions + Coffee price intelligence
+**Document Version:** 1.4
+**Last Updated:** 2026-03-16
+**Architecture Pattern:** NestJS 8 with MQTT + WebSocket dual transport + FCM push notifications + Farm-level subscriptions + Coffee price intelligence + Pump session tracking

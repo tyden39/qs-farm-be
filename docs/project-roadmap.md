@@ -197,6 +197,15 @@ The IoT Farm Management Platform follows a phased development approach, progress
   - CoffeePrice entity with UNIQUE(date, market) constraint
   - REST endpoints: `GET /api/coffee-price` (filtered) + `GET /api/coffee-price/latest`
   - Max 365-day query range, JWT-protected access
+- ✅ **Pump session tracking & maintenance monitoring** (delivered 2026-03-16)
+  - Event-driven pump lifecycle: `pump.started`, `pump.stopped`, `pump.disconnected`
+  - PumpSession entity with cycle tracking and sensor aggregates
+  - MQTT session ID handshake for session identification
+  - Stale session auto-cleanup (60s interval, 30s inactivity threshold)
+  - Device enhancements: operatingLifeHours, totalOperatingHours fields
+  - Report API: `GET /api/pump/report/:deviceId` (JSON) + `?format=excel` (export)
+  - Report contents: summary, maintenance alerts, timeline, session details
+  - Excel export via exceljs with formatted tables
 - Email alerts on threshold breach
 - SMS alerts (Twilio integration)
 - In-app notifications with notification center
@@ -245,10 +254,13 @@ The IoT Farm Management Platform follows a phased development approach, progress
 - [x] FCM push notifications delivered to mobile app on alert/schedule
 - [x] Coffee price data updated daily at midnight Vietnam time
 - [x] Coffee price scrape succeeds with 3-retry fallback
+- [x] Pump session tracking captures on/off cycles with lifecycle events
+- [x] Pump report API returns summary + maintenance + timeline + sessions
+- [x] Pump excel export formats data with tables and summaries
+- [x] Stale pump sessions auto-close after 30s inactivity
 - [ ] Email notifications sent < 5 seconds after alert
 - [ ] Analytics dashboards load in < 2 seconds
 - [ ] Mobile app achieves > 4.5 star rating
-- [ ] Report generation < 30 seconds
 - [ ] Third-party integrations tested and documented
 
 ## Phase 5: Scale & Optimization (Planned - 0%)
@@ -335,7 +347,8 @@ Phase 1: Core Infrastructure
        ├─ EMQX Integration ✅
        ├─ FCM Push Notifications ✅ (early delivery)
        ├─ Farm-Level WebSocket ✅ (early delivery)
-       └─ Coffee Price Intelligence ✅ (early delivery)
+       ├─ Coffee Price Intelligence ✅ (early delivery)
+       └─ Pump Session Tracking ✅ (early delivery)
           │
           └─→ Phase 3: Production Hardening
               │
@@ -430,10 +443,11 @@ Phase 1: Core Infrastructure
 
 ---
 
-**Document Version:** 1.3
-**Last Updated:** 2026-03-12
+**Document Version:** 1.4
+**Last Updated:** 2026-03-16
 **Phase 1-2 Status:** Complete
 **Phase 3-5 Status:** Planned (High confidence in Phase 3 timeline)
 **FCM Push:** Delivered early (2026-03-03), ahead of Phase 4 schedule
 **Farm-Level WebSocket:** Delivered (2026-03-11) with conditional FCM optimization
 **Coffee Price Intelligence:** Delivered (2026-03-12) with 3-retry scraping and daily scheduling
+**Pump Session Tracking:** Delivered (2026-03-16) with event-driven lifecycle and excel exports
