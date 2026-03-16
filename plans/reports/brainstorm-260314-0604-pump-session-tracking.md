@@ -1,7 +1,7 @@
 # Brainstorm: Pump Session Tracking & Operating Life
 
 **Date:** 2026-03-14
-**Status:** Agreed (Updated 2026-03-14)
+**Status:** Agreed (Updated 2026-03-16)
 
 ---
 
@@ -65,8 +65,12 @@ PumpSession {
 
   hasAlert: boolean               // có bất kỳ alert nào trong session
 
-  // LWT handling
-  closedByLwt: boolean           // true = session bị đóng do ESP disconnect đột ngột
+  // Session integrity
+  status: 'active' | 'completed' | 'interrupted'
+  interruptedReason: 'lwt' | 'esp_reboot' | 'timeout' | null
+  // lwt = ESP mất điện đột ngột (LWT publish)
+  // esp_reboot = ESP reboot, gửi PUMP_STATUS=0 không có sessionId
+  // timeout = cron detect no sensor data >30s (covers server down + QoS 0 drop)
 
   createdAt: timestamp
 }
@@ -96,21 +100,45 @@ src/pump/
 ```
 
 **PumpService event listeners:**
-- `@OnEvent('pump.started')` → tìm open session hoặc tạo mới với `sessionNumber++`
+- `@OnEvent('pump.started')` → tìm open session hoặc tạo mới với `sessionNumber++`. Tạo sessionId (UUID) → publish xuống ESP qua `device/{id}/session` topic: `{sessionId: "uuid"}`
 - `@OnEvent('pump.stopped')` →
-  1. Tìm open session (endedAt = null)
+  1. Tìm open session bằng `sessionId` (nếu có) hoặc bằng `deviceId` (nếu không có sessionId → esp_reboot)
   2. Query SensorData[startedAt..now] cho 5 sensor types → tính aggregates
   3. Query AlertLog[startedAt..now] → set overcurrent fields + `hasAlert`
-  4. Đóng session: set endedAt, durationSeconds, closedByLwt=false
+  4. Đóng session: set endedAt, durationSeconds, status=`completed`
   5. UPDATE Device: `totalOperatingHours += durationSeconds / 3600` (atomic transaction)
+- `@OnEvent('pump.stopped')` khi **không có sessionId** →
+  1. Tìm open session bằng deviceId → đóng với status=`interrupted`, interruptedReason=`esp_reboot`
+  2. **KHÔNG cộng** vào `totalOperatingHours`
 - `@OnEvent('pump.disconnected')` (LWT) →
   1. Tìm open session
-  2. Đóng session với `closedByLwt=true`, `endedAt=now`
-  3. **KHÔNG cộng** vào `totalOperatingHours` (thời gian không chính xác)
+  2. endedAt = MAX(created_at) FROM sensor_data WHERE device_id AND created_at >= startedAt
+  3. Đóng session với status=`interrupted`, interruptedReason=`lwt`
+  4. **KHÔNG cộng** vào `totalOperatingHours` (thời gian không chính xác)
+
+**Cron: stale session cleanup** — `@Interval(60_000)`:
+- Tìm sessions `status='active'` mà không có sensor_data trong 30s
+- endedAt = last sensor_data timestamp cho device
+- status=`interrupted`, interruptedReason=`timeout`
+- **KHÔNG cộng** vào `totalOperatingHours`
+- Covers: server down rồi restart, QoS 0 bị drop, network issues
+
+**Session ID Handshake (QoS 0):**
+```
+ESP → PUMP_STATUS=1
+Server → tạo PumpSession → publish sessionId qua device/{id}/session
+ESP → lưu sessionId trong RAM
+
+Pump dừng:
+ESP → PUMP_STATUS=0 + sessionId → xóa sessionId khỏi RAM (gửi 1 lần, QoS 0)
+Server → tìm by sessionId → close → completed
+```
 
 **SyncService changes (nhỏ):**
-- Khi nhận PUMP_STATUS telemetry: emit `pump.started` / `pump.stopped` — KHÔNG lưu SensorData
+- Khi nhận PUMP_STATUS telemetry: emit `pump.started` / `pump.stopped` (include sessionId nếu có) — KHÔNG lưu SensorData
 - Khi nhận `device/{id}/status` với `reason: "lwt"`: emit `pump.disconnected`
+
+**totalOperatingHours** chỉ cộng session `completed`. Session `interrupted` (lwt/esp_reboot/timeout) KHÔNG tính.
 
 ---
 
@@ -210,7 +238,12 @@ Library: **`exceljs`**
 | Item | Decision |
 |---|---|
 | PUMP_STATUS lưu SensorData? | Không — ephemeral trigger, YAGNI |
-| Open session khi server restart | ESP re-send PUMP_STATUS → backend tiếp tục session cũ |
+| Open session khi server restart | Session vẫn trong DB → ESP re-send PUMP_STATUS=1 → backend tìm open session → re-publish sessionId |
+| Session ID handshake | Server gen UUID → publish qua device/{id}/session → ESP lưu RAM → gửi lại khi close |
+| QoS level | 0 (fire and forget) — ESP gửi close 1 lần rồi xóa sessionId |
+| Interrupted session detection | 3 reasons: lwt, esp_reboot, timeout (cron 30s no data) |
+| Cron endedAt | Last sensor_data timestamp — chính xác ±2s |
+| totalOperatingHours | Chỉ cộng completed sessions |
 | ELECTRICAL_PHASE value | Số pha: 1, 2, 3 — track max trong session |
 | Overcurrent detection | Từ AlertLog CRITICAL cho ELECTRICAL_CURRENT (count + maxValue) |
 | totalOperatingHours khi LWT | KHÔNG cộng — thời gian không chính xác |
@@ -220,14 +253,18 @@ Library: **`exceljs`**
 | Timeline query | Tái dụng DATE_TRUNC pattern từ SensorService |
 | LWT topic | `device/{deviceId}/status` với payload `{online: false, reason: "lwt"}` |
 
-### LWT Flow Chi tiết
+### Session Integrity Flow
 
-| Scenario | Action | closedByLwt | totalHours cộng? |
-|---|---|---|---|
-| Pump dừng bình thường | PUMP_STATUS=0 → close session | false | ✅ Có |
-| ESP shutdown sạch | status.offline → ignore (session đã đóng) | — | — |
-| ESP crash/mất điện | LWT → pump.disconnected → close | true | ❌ Không |
-| Server restart | ESP reconnect → re-send PUMP_STATUS=1 → session tiếp tục | — | — |
+| Scenario | Trigger | status | interruptedReason | totalHours? |
+|---|---|---|---|---|
+| Pump dừng bình thường (đúng sessionId) | PUMP_STATUS=0 + sessionId | `completed` | null | ✅ Cộng |
+| ESP reboot (mất RAM, mất sessionId) | PUMP_STATUS=0, no sessionId | `interrupted` | `esp_reboot` | ❌ Không |
+| ESP crash/mất điện | LWT auto-publish | `interrupted` | `lwt` | ❌ Không |
+| Server down + QoS 0 drop / no data | Cron: no sensor data >30s | `interrupted` | `timeout` | ❌ Không |
+| Server restart, pump vẫn chạy | ESP re-send PUMP_STATUS=1 → reuse session | `active` | — | — |
+| ESP reboot → pump dừng | Pump dừng khi reboot, boot lại check schedule → tạo session mới nếu cần | — | — | — |
+
+**Cron endedAt cho interrupted sessions:** `MAX(created_at) FROM sensor_data WHERE device_id AND created_at >= startedAt` → chính xác ±2s (telemetry interval 2s).
 
 ---
 
@@ -263,9 +300,12 @@ Library: **`exceljs`**
 ## Success Metrics
 
 - [ ] PumpSession tự động tạo/đóng khi nhận PUMP_STATUS telemetry
-- [ ] LWT → session đóng với `closedByLwt=true`, không cộng totalOperatingHours
+- [ ] Session ID handshake: server gen → publish → ESP lưu → close kèm sessionId
+- [ ] LWT → session interrupted/lwt, không cộng totalOperatingHours
+- [ ] ESP reboot → session interrupted/esp_reboot (no sessionId)
+- [ ] Cron: stale sessions (no data 30s) → interrupted/timeout, endedAt = last sensor timestamp
 - [ ] Report API: timeline grouping đúng granularity theo range
 - [ ] `maintenanceWarning` / `maintenanceRequired` flag chính xác
 - [ ] overcurrentDetected + overcurrentCount + overcurrentMaxCurrent đúng từ AlertLog
 - [ ] Excel download đúng format, summary row, maintenance sheet nếu cần
-- [ ] ESP reconnect → session tiếp tục bình thường
+- [ ] Server restart → ESP reconnect → reuse open session + re-publish sessionId
