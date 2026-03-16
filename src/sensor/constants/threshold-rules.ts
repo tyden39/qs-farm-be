@@ -28,4 +28,8 @@ export const SENSOR_REASON_MAP: Record<
     belowMin: 'Lỗi pha điện',
     aboveMax: 'Quá điện áp pha',
   },
+  [SensorType.PUMP_STATUS]: {
+    belowMin: 'Trạng thái bơm thấp',
+    aboveMax: 'Trạng thái bơm cao',
+  },
 };

@@ -9,7 +9,7 @@ import { SensorThreshold } from './entities/sensor-threshold.entity';
 import { SensorData } from './entities/sensor-data.entity';
 import { AlertLog } from './entities/alert-log.entity';
 import { CommandLog, CommandSource } from './entities/command-log.entity';
-import { PAYLOAD_TO_SENSOR_TYPE } from './enums/sensor-type.enum';
+import { PAYLOAD_TO_SENSOR_TYPE, SensorType } from './enums/sensor-type.enum';
 import { SensorMode } from './enums/sensor-mode.enum';
 import { CreateSensorConfigDto } from './dto/create-sensor-config.dto';
 import { UpdateSensorConfigDto } from './dto/update-sensor-config.dto';
@@ -83,15 +83,22 @@ export class SensorService {
 
       if (readings.length === 0) return;
 
-      // Bulk insert sensor data
-      const sensorDataEntities = readings.map((r) =>
-        this.sensorDataRepo.create({
-          deviceId,
-          sensorType: r.sensorType as any,
-          value: r.value,
-        }),
+      // Filter out PUMP_STATUS -- it triggers events only, not stored as sensor data
+      const storableReadings = readings.filter(
+        (r) => r.sensorType !== SensorType.PUMP_STATUS,
       );
-      await this.sensorDataRepo.save(sensorDataEntities);
+
+      if (storableReadings.length > 0) {
+        // Bulk insert sensor data
+        const sensorDataEntities = storableReadings.map((r) =>
+          this.sensorDataRepo.create({
+            deviceId,
+            sensorType: r.sensorType as any,
+            value: r.value,
+          }),
+        );
+        await this.sensorDataRepo.save(sensorDataEntities);
+      }
 
       // Load configs (cached)
       const configs = await this.getConfigsForDevice(deviceId);

@@ -5,6 +5,7 @@ export enum SensorType {
   SOIL_MOISTURE = 'soil_moisture',
   ELECTRICAL_CURRENT = 'electrical_current',
   ELECTRICAL_PHASE = 'electrical_phase',
+  PUMP_STATUS = 'pump_status',
 }
 
 export const SENSOR_TYPE_LABEL: Record<SensorType, string> = {
@@ -14,6 +15,7 @@ export const SENSOR_TYPE_LABEL: Record<SensorType, string> = {
   [SensorType.SOIL_MOISTURE]: 'Độ ẩm đất',
   [SensorType.ELECTRICAL_CURRENT]: 'Dòng điện',
   [SensorType.ELECTRICAL_PHASE]: 'Pha điện',
+  [SensorType.PUMP_STATUS]: 'Trạng thái bơm',
 };
 
 export const PAYLOAD_TO_SENSOR_TYPE: Record<string, SensorType> = {
@@ -23,4 +25,5 @@ export const PAYLOAD_TO_SENSOR_TYPE: Record<string, SensorType> = {
   soilMoisture: SensorType.SOIL_MOISTURE,
   current: SensorType.ELECTRICAL_CURRENT,
   phase: SensorType.ELECTRICAL_PHASE,
+  pumpStatus: SensorType.PUMP_STATUS,
 };
