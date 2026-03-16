@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsNumber } from 'class-validator';
 
 export class CreateDeviceDto {
   @IsString()
@@ -21,4 +21,8 @@ export class CreateDeviceDto {
 
   @IsUUID()
   readonly farmId: string;
+
+  @IsOptional()
+  @IsNumber()
+  readonly operatingLifeHours?: number;
 }

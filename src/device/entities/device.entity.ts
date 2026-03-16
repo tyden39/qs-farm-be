@@ -58,6 +58,12 @@ export class Device {
   @Column({ nullable: true })
   pairedAt: Date;
 
+  @Column({ type: 'float', nullable: true })
+  operatingLifeHours: number;
+
+  @Column({ type: 'float', default: 0 })
+  totalOperatingHours: number;
+
   @Column('uuid', { nullable: true })
   farmId: string;
 

@@ -130,6 +130,15 @@ export class SyncService implements OnModuleInit {
       },
       farmId,
     );
+
+    // LWT disconnect detection
+    if (payload.reason === 'lwt') {
+      this.eventEmitter.emit('pump.disconnected', {
+        deviceId,
+        farmId,
+        timestamp,
+      });
+    }
   }
 
   /**
@@ -158,6 +167,20 @@ export class SyncService implements OnModuleInit {
       timestamp,
       farmId,
     });
+
+    // Pump status events
+    if (payload.pumpStatus !== undefined) {
+      if (payload.pumpStatus === 1) {
+        this.eventEmitter.emit('pump.started', { deviceId, farmId, timestamp });
+      } else if (payload.pumpStatus === 0) {
+        this.eventEmitter.emit('pump.stopped', {
+          deviceId,
+          farmId,
+          sessionId: payload.sessionId || null,
+          timestamp,
+        });
+      }
+    }
   }
 
   /**
