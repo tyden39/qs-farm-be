@@ -19,8 +19,8 @@ export class CoffeePriceService {
     private readonly coffeePriceRepo: Repository<CoffeePrice>,
   ) {}
 
-  // Runs daily at midnight Vietnam time
-  @Cron('0 0 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  // Runs daily at noon (12:00 PM) Vietnam time
+  @Cron('0 12 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async handleDailyScrape(): Promise<void> {
     this.logger.log('Starting daily coffee price scrape');
     for (let attempt = 0; attempt < this.MAX_RETRIES; attempt++) {
@@ -127,9 +127,7 @@ export class CoffeePriceService {
         market,
         marketLabel: CoffeeMarketLabel[market],
         averagePrice: this.parseVietnameseNumber(row.price),
-        priceChange: row.change
-          ? this.parseVietnameseNumber(row.change)
-          : null,
+        priceChange: row.change ? this.parseVietnameseNumber(row.change) : null,
         unit: market === CoffeeMarket.USD_VND ? 'VND/USD' : 'VND/kg',
       });
     }

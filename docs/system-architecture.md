@@ -289,7 +289,7 @@
 │  │  ├── imports: none                                         │  │
 │  │  │                                                         │  │
 │  │  ├── CoffeePriceService                                   │  │
-│  │  │   ├── @Cron('0 0 * * *', timezone: 'Asia/Ho_Chi_Minh')│  │
+│  │  │   ├── @Cron('0 12 * * *', timezone: 'Asia/Ho_Chi_Minh')│  │
 │  │  │   ├── Daily web scrape of giacaphe.com prices         │  │
 │  │  │   ├── Puppeteer v19 (headless + Cloudflare handler)  │  │
 │  │  │   ├── Cheerio parsing for table extraction           │  │

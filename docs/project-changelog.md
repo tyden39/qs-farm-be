@@ -2,6 +2,22 @@
 
 All notable changes to the IoT Farm Management Platform are documented in this file.
 
+## Version 1.4.1 (2026-03-17)
+
+### Updated: Coffee Price Intelligence Scheduling
+
+**Change:** Adjusted daily coffee price scraping schedule
+
+- **Previous Schedule:** Midnight (00:00) Asia/Ho_Chi_Minh timezone
+- **New Schedule:** Noon (12:00 PM) Asia/Ho_Chi_Minh timezone
+- **Cron Expression:** `'0 12 * * *'` (updated from `'0 0 * * *'`)
+- **Rationale:** Better alignment with market opening hours for more current pricing data
+- **File Modified:** `src/coffee-price/coffee-price.service.ts`
+- **Documentation Updated:** System architecture (CLAUDE.md)
+- **Status:** Code review passed, build verified, no functional regressions
+
+---
+
 ## Version 1.4 (2026-03-16)
 
 ### Added: Pump Session Tracking & Maintenance Monitoring
@@ -243,5 +259,5 @@ All notable changes to the IoT Farm Management Platform are documented in this f
 ---
 
 **Changelog Maintained By:** Documentation Management System
-**Last Updated:** 2026-03-12
+**Last Updated:** 2026-03-17
 **Format:** Semantic Versioning (MAJOR.MINOR.PATCH)

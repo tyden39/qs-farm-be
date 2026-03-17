@@ -189,7 +189,7 @@ The IoT Farm Management Platform follows a phased development approach, progress
   - Conditional FCM: skip when farm owner has active WebSocket connection
   - FarmId caching (60s TTL) for reduced DB load
   - Dual room broadcasts (device + farm) with no duplicate delivery
-- ✅ **Coffee price market intelligence** (delivered 2026-03-12)
+- ✅ **Coffee price market intelligence** (delivered 2026-03-12, schedule updated 2026-03-17)
   - Daily automated scraping from giacaphe.com (7 Vietnamese markets)
   - Puppeteer v19 with Cloudflare protection handling
   - Cheerio HTML parsing for reliable data extraction
@@ -197,6 +197,7 @@ The IoT Farm Management Platform follows a phased development approach, progress
   - CoffeePrice entity with UNIQUE(date, market) constraint
   - REST endpoints: `GET /api/coffee-price` (filtered) + `GET /api/coffee-price/latest`
   - Max 365-day query range, JWT-protected access
+  - Schedule: Daily scrape at 12:00 PM (noon) Vietnam time (Asia/Ho_Chi_Minh)
 - ✅ **Pump session tracking & maintenance monitoring** (delivered 2026-03-16)
   - Event-driven pump lifecycle: `pump.started`, `pump.stopped`, `pump.disconnected`
   - PumpSession entity with cycle tracking and sensor aggregates
@@ -252,7 +253,7 @@ The IoT Farm Management Platform follows a phased development approach, progress
 
 ### Success Criteria
 - [x] FCM push notifications delivered to mobile app on alert/schedule
-- [x] Coffee price data updated daily at midnight Vietnam time
+- [x] Coffee price data updated daily at noon (12:00 PM) Vietnam time
 - [x] Coffee price scrape succeeds with 3-retry fallback
 - [x] Pump session tracking captures on/off cycles with lifecycle events
 - [x] Pump report API returns summary + maintenance + timeline + sessions
@@ -444,10 +445,10 @@ Phase 1: Core Infrastructure
 ---
 
 **Document Version:** 1.4
-**Last Updated:** 2026-03-16
+**Last Updated:** 2026-03-17
 **Phase 1-2 Status:** Complete
 **Phase 3-5 Status:** Planned (High confidence in Phase 3 timeline)
 **FCM Push:** Delivered early (2026-03-03), ahead of Phase 4 schedule
 **Farm-Level WebSocket:** Delivered (2026-03-11) with conditional FCM optimization
-**Coffee Price Intelligence:** Delivered (2026-03-12) with 3-retry scraping and daily scheduling
+**Coffee Price Intelligence:** Delivered (2026-03-12), schedule updated to noon (2026-03-17)
 **Pump Session Tracking:** Delivered (2026-03-16) with event-driven lifecycle and excel exports
