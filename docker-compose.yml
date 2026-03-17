@@ -48,6 +48,7 @@ services:
   nest-backend:
     image: ghcr.io/tyden39/qs-farm-be:latest
     restart: always
+    user: root
     env_file:
       - .env
     environment:

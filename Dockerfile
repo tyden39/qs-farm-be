@@ -40,13 +40,17 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY package.json ./
 
-# Create non-root user and pre-create upload directories
+# Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser \
-    && mkdir -p /app/files/firmware /app/files \
     && chown -R appuser:appuser /app
+
+# Entrypoint ensures upload dirs exist at runtime (volume may shadow image dirs)
+COPY --chown=root:root docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 USER appuser
 
 EXPOSE 3000
 
-ENTRYPOINT ["dumb-init", "--"]
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "dist/main.js"]
