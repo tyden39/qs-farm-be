@@ -40,8 +40,9 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY package.json ./
 
-# Create non-root user
+# Create non-root user and pre-create upload directories
 RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser \
+    && mkdir -p /app/files/firmware /app/files \
     && chown -R appuser:appuser /app
 USER appuser
 
