@@ -140,7 +140,11 @@ export class PumpService {
           return;
         }
 
-        await this.closeSession(session, timestamp, PumpSessionStatus.COMPLETED);
+        await this.closeSession(
+          session,
+          timestamp,
+          PumpSessionStatus.COMPLETED,
+        );
       } else {
         // ESP reboot -- no sessionId, find active by deviceId
         session = await this.pumpSessionRepo.findOne({
@@ -273,14 +277,15 @@ export class PumpService {
         .createQueryBuilder()
         .update(Device)
         .set({
-          totalOperatingHours: () =>
-            `"totalOperatingHours" + ${durationHours}`,
+          totalOperatingHours: () => `"totalOperatingHours" + ${durationHours}`,
         })
         .where('id = :id', { id: session.deviceId })
         .execute();
 
       this.logger.log(
-        `Device ${session.deviceId} totalOperatingHours += ${durationHours.toFixed(2)}h`,
+        `Device ${
+          session.deviceId
+        } totalOperatingHours += ${durationHours.toFixed(2)}h`,
       );
     }
   }
@@ -661,7 +666,10 @@ export class PumpService {
     this.buildSessionsSheet(workbook, report);
 
     // Sheet 2: Maintenance (conditional)
-    if (report.maintenanceInfo?.isWarning || report.maintenanceInfo?.isRequired) {
+    if (
+      report.maintenanceInfo?.isWarning ||
+      report.maintenanceInfo?.isRequired
+    ) {
       this.buildMaintenanceSheet(workbook, report.maintenanceInfo);
     }
 
@@ -764,24 +772,39 @@ export class PumpService {
     const headerRow = sheet.getRow(1);
     headerRow.font = { bold: true };
 
-    sheet.addRow({ field: 'Operating Life (hours)', value: info.operatingLifeHours });
-    sheet.addRow({ field: 'Total Operating Hours', value: info.totalOperatingHours });
+    sheet.addRow({
+      field: 'Operating Life (hours)',
+      value: info.operatingLifeHours,
+    });
+    sheet.addRow({
+      field: 'Total Operating Hours',
+      value: info.totalOperatingHours,
+    });
     sheet.addRow({ field: 'Usage (%)', value: `${info.usagePercent}%` });
-    sheet.addRow({ field: 'Warning Threshold', value: `${info.warningThreshold}%` });
+    sheet.addRow({
+      field: 'Warning Threshold',
+      value: `${info.warningThreshold}%`,
+    });
 
     const statusRow = sheet.addRow({
       field: 'Status',
       value: info.isRequired
         ? 'MAINTENANCE REQUIRED'
         : info.isWarning
-          ? 'MAINTENANCE WARNING'
-          : 'OK',
+        ? 'MAINTENANCE WARNING'
+        : 'OK',
     });
 
     if (info.isRequired) {
-      statusRow.getCell('value').font = { bold: true, color: { argb: 'FFFF0000' } };
+      statusRow.getCell('value').font = {
+        bold: true,
+        color: { argb: 'FFFF0000' },
+      };
     } else if (info.isWarning) {
-      statusRow.getCell('value').font = { bold: true, color: { argb: 'FFFF8C00' } };
+      statusRow.getCell('value').font = {
+        bold: true,
+        color: { argb: 'FFFF8C00' },
+      };
     }
 
     sheet.addRow({});
