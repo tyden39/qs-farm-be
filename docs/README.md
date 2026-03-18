@@ -264,7 +264,7 @@ Find solutions to common problems.
 ## File Organization
 
 ```
-/home/duc/workspace/nest-websockets-chat-boilerplate/
+/home/duc/workspace/qs-farm/
 ├── README.md                          (Project overview & quick start)
 │
 └── docs/
@@ -274,7 +274,9 @@ Find solutions to common problems.
     ├── code-standards.md              (Naming, patterns, architecture)
     ├── system-architecture.md         (Design, flows, authentication)
     ├── project-roadmap.md             (Phases, timeline, metrics)
-    └── deployment-guide.md            (Setup, deployment, troubleshooting)
+    ├── deployment-guide.md            (Setup, deployment, troubleshooting)
+    ├── test-guide-pump-session-tracking.md (Pump session testing & features)
+    └── project-changelog.md           (Version history and release notes)
 ```
 
 ---
@@ -311,14 +313,14 @@ Find solutions to common problems.
 
 ## Quick Links
 
-- **Source Code:** `/home/duc/workspace/nest-websockets-chat-boilerplate/src/`
-- **Project Root:** `/home/duc/workspace/nest-websockets-chat-boilerplate/`
-- **Docker Compose:** `/home/duc/workspace/nest-websockets-chat-boilerplate/docker-compose.yml`
-- **Environment:** `/home/duc/workspace/nest-websockets-chat-boilerplate/.env.example`
-- **Build Output:** `/home/duc/workspace/nest-websockets-chat-boilerplate/dist/`
+- **Source Code:** `/home/duc/workspace/qs-farm/src/`
+- **Project Root:** `/home/duc/workspace/qs-farm/`
+- **Docker Compose:** `/home/duc/workspace/qs-farm/docker-compose.yml`
+- **Environment:** `/home/duc/workspace/qs-farm/.env.example`
+- **Build Output:** `/home/duc/workspace/qs-farm/dist/`
 
 ---
 
-**Last Updated:** 2026-02-25
-**Documentation Version:** 1.0
-**Project Phase:** 2 (Complete)
+**Last Updated:** 2026-03-18
+**Documentation Version:** 1.1
+**Project Phase:** 2 Complete + Advanced Features In Progress

@@ -11,6 +11,7 @@ import {
 import { Device } from 'src/device/entities/device.entity';
 import { PumpSessionStatus } from '../enums/pump-session-status.enum';
 import { InterruptedReason } from '../enums/interrupted-reason.enum';
+import { PumpOperationMode } from '../enums/pump-operation-mode.enum';
 
 @Entity()
 @Index(['deviceId', 'startedAt'])
@@ -28,6 +29,13 @@ export class PumpSession {
 
   @Column({ type: 'int' })
   sessionNumber: number;
+
+  @Column({
+    type: 'enum',
+    enum: PumpOperationMode,
+    default: PumpOperationMode.NORMAL,
+  })
+  operationMode: PumpOperationMode;
 
   @Column({ type: 'timestamp' })
   startedAt: Date;

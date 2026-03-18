@@ -171,7 +171,12 @@ export class SyncService implements OnModuleInit {
     // Pump status events
     if (payload.pumpStatus !== undefined) {
       if (payload.pumpStatus === 1) {
-        this.eventEmitter.emit('pump.started', { deviceId, farmId, timestamp });
+        this.eventEmitter.emit('pump.started', {
+          deviceId,
+          farmId,
+          timestamp,
+          operationMode: payload.mode || undefined,
+        });
       } else if (payload.pumpStatus === 0) {
         this.eventEmitter.emit('pump.stopped', {
           deviceId,

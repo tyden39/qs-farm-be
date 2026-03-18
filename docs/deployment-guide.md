@@ -24,7 +24,7 @@
 ```bash
 # Clone repository
 git clone <repository-url>
-cd nest-websockets-chat-boilerplate
+cd qs-farm
 
 # Install dependencies
 yarn install
@@ -71,6 +71,13 @@ MQTT_PASSWORD=
 EMQX_DASHBOARD_URL=http://localhost:18083
 EMQX_API_KEY=
 EMQX_API_SECRET=
+
+# Firebase Cloud Messaging (v1.1+)
+FIREBASE_SERVICE_ACCOUNT_PATH=/app/config/firebase-service-account.json
+
+# Puppeteer Configuration (v1.3 - Coffee Price)
+PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Node Environment
 NODE_ENV=development
@@ -147,7 +154,67 @@ EMQX_DASHBOARD_URL=https://emqx-admin.example.com
 EMQX_API_KEY=<api-key>
 EMQX_API_SECRET=<api-secret>
 
+# Firebase Cloud Messaging (v1.1+)
+FIREBASE_SERVICE_ACCOUNT_PATH=/app/config/firebase-service-account.json
+
+# Puppeteer Configuration (v1.3)
+PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
+PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
 NODE_ENV=production
+```
+
+### System Dependencies for New Modules
+
+**Dockerfile updates for v1.4.1:**
+
+```dockerfile
+# Install system dependencies for Puppeteer (v1.3 - Coffee Price) and Chromium
+RUN apt-get update && apt-get install -y \
+    chromium-browser \
+    ca-certificates \
+    fonts-liberation \
+    libappindicator3-1 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libc6 \
+    libcairo2 \
+    libcups2 \
+    libdbus-1-3 \
+    libexpat1 \
+    libfontconfig1 \
+    libgbm1 \
+    libgcc1 \
+    libgconf-2-4 \
+    libgdk-pixbuf1.0-0 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libicu67 \
+    libpangocairo-1.0-0 \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libstdc++6 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxinerama1 \
+    libxrandr2 \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
+    lsb-release \
+    wget \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pre-create /app/files/firmware directory for non-root user
+RUN mkdir -p /app/files/firmware && chown -R node:node /app/files
 ```
 
 ### Building for Production
@@ -163,7 +230,7 @@ yarn build
 # Verify build: ls -la dist/
 
 # Build Docker image
-docker build -t farm-management:1.0.0 .
+docker build -t farm-management:1.4.1 .
 ```
 
 ### Production Docker Compose
@@ -211,7 +278,7 @@ services:
     restart: unless-stopped
 
   backend:
-    image: farm-management:1.0.0
+    image: farm-management:1.4.1
     environment:
       NODE_ENV: production
       DB_HOST: postgres
@@ -222,6 +289,12 @@ services:
       MQTT_BROKER_URL: mqtt://emqx:1883
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      FIREBASE_SERVICE_ACCOUNT_PATH: /app/config/firebase-service-account.json
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+    volumes:
+      - /app/files:/app/files
+      - /app/config:/app/config:ro
+      - /app/logs:/app/logs
     ports:
       - "3000:3000"
     depends_on:
@@ -264,7 +337,7 @@ cp .env.example .env.production
 # Edit .env.production with production secrets
 
 # 4. Build Docker image
-docker build -t farm-management:1.0.0 .
+docker build -t farm-management:1.4.1 .
 
 # 5. Stop old containers
 docker-compose down
@@ -373,6 +446,14 @@ CREATE INDEX idx_command_log_device_created
   ON command_log(device_id, created_at DESC);
 CREATE INDEX idx_alert_log_device_created
   ON alert_log(device_id, created_at DESC);
+
+-- Indexes for v1.4 (Pump, Firmware)
+CREATE INDEX idx_pump_session_device_created
+  ON pump_session(device_id, created_at DESC);
+CREATE INDEX idx_coffee_price_date_market
+  ON coffee_price(date DESC, market);
+CREATE INDEX idx_firmware_update_log_device_created
+  ON firmware_update_log(device_id, created_at DESC);
 
 -- Vacuum and analyze
 VACUUM ANALYZE;

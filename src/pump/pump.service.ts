@@ -7,6 +7,7 @@ import { Interval } from '@nestjs/schedule';
 import { PumpSession } from './entities/pump-session.entity';
 import { PumpSessionStatus } from './enums/pump-session-status.enum';
 import { InterruptedReason } from './enums/interrupted-reason.enum';
+import { PumpOperationMode } from './enums/pump-operation-mode.enum';
 import { PumpReportQueryDto } from './dto/pump-report-query.dto';
 import { Device } from 'src/device/entities/device.entity';
 import { SensorData } from 'src/sensor/entities/sensor-data.entity';
@@ -22,6 +23,7 @@ export interface PumpStartedEvent {
   deviceId: string;
   farmId?: string;
   timestamp: Date;
+  operationMode?: string;
 }
 
 export interface PumpStoppedEvent {
@@ -85,11 +87,20 @@ export class PumpService {
 
       const sessionNumber = (maxResult?.max || 0) + 1;
 
+      // Validate operation mode (fallback to NORMAL if invalid/missing)
+      const validModes = Object.values(PumpOperationMode);
+      const operationMode = validModes.includes(
+        event.operationMode as PumpOperationMode,
+      )
+        ? (event.operationMode as PumpOperationMode)
+        : PumpOperationMode.NORMAL;
+
       // Create new session
       const session = this.pumpSessionRepo.create({
         deviceId,
         sessionNumber,
         startedAt: timestamp,
+        operationMode,
         status: PumpSessionStatus.ACTIVE,
       });
 
@@ -514,27 +525,37 @@ export class PumpService {
   }
 
   private async getSummary(deviceId: string, from: Date, to: Date) {
-    const result = await this.pumpSessionRepo
-      .createQueryBuilder('ps')
-      .select('COUNT(*)', 'totalSessions')
-      .addSelect('SUM(ps.durationSeconds)', 'totalDurationSeconds')
-      .addSelect('AVG(ps.durationSeconds)', 'avgDurationSeconds')
-      .addSelect('SUM(ps.flowTotal)', 'totalFlow')
-      .addSelect('MIN(ps.tempMin)', 'tempMin')
-      .addSelect('MAX(ps.tempMax)', 'tempMax')
-      .addSelect('MIN(ps.pressureMin)', 'pressureMin')
-      .addSelect('MAX(ps.pressureMax)', 'pressureMax')
-      .addSelect('MIN(ps.currentMin)', 'currentMin')
-      .addSelect('MAX(ps.currentMax)', 'currentMax')
-      .addSelect(
-        'SUM(CASE WHEN ps.overcurrentDetected = true THEN 1 ELSE 0 END)',
-        'overcurrentSessions',
-      )
-      .addSelect('SUM(ps.overcurrentCount)', 'overcurrentTotalCount')
-      .where('ps.deviceId = :deviceId', { deviceId })
-      .andWhere('ps.startedAt >= :from', { from })
-      .andWhere('ps.startedAt <= :to', { to })
-      .getRawOne();
+    const [result, modeBreakdown] = await Promise.all([
+      this.pumpSessionRepo
+        .createQueryBuilder('ps')
+        .select('COUNT(*)', 'totalSessions')
+        .addSelect('SUM(ps.durationSeconds)', 'totalDurationSeconds')
+        .addSelect('AVG(ps.durationSeconds)', 'avgDurationSeconds')
+        .addSelect('SUM(ps.flowTotal)', 'totalFlow')
+        .addSelect('MIN(ps.tempMin)', 'tempMin')
+        .addSelect('MAX(ps.tempMax)', 'tempMax')
+        .addSelect('MIN(ps.pressureMin)', 'pressureMin')
+        .addSelect('MAX(ps.pressureMax)', 'pressureMax')
+        .addSelect('MIN(ps.currentMin)', 'currentMin')
+        .addSelect('MAX(ps.currentMax)', 'currentMax')
+        .addSelect(
+          'SUM(CASE WHEN ps.overcurrentDetected = true THEN 1 ELSE 0 END)',
+          'overcurrentSessions',
+        )
+        .addSelect('SUM(ps.overcurrentCount)', 'overcurrentTotalCount')
+        .where('ps.deviceId = :deviceId', { deviceId })
+        .andWhere('ps.startedAt >= :from', { from })
+        .andWhere('ps.startedAt <= :to', { to })
+        .getRawOne(),
+      this.pumpSessionRepo
+        .createQueryBuilder('ps')
+        .select('ps.operationMode', 'mode')
+        .addSelect('COUNT(*)', 'count')
+        .where('ps.deviceId = :deviceId', { deviceId })
+        .andWhere('ps.startedAt >= :from AND ps.startedAt <= :to', { from, to })
+        .groupBy('ps.operationMode')
+        .getRawMany(),
+    ]);
 
     const totalSeconds = parseFloat(result.totalDurationSeconds) || 0;
 
@@ -559,6 +580,10 @@ export class PumpService {
       },
       overcurrentSessions: parseInt(result.overcurrentSessions, 10) || 0,
       overcurrentTotalCount: parseInt(result.overcurrentTotalCount, 10) || 0,
+      modeBreakdown: modeBreakdown.map((r) => ({
+        mode: r.mode,
+        count: parseInt(r.count, 10),
+      })),
     };
   }
 
@@ -680,8 +705,16 @@ export class PumpService {
   private buildSessionsSheet(workbook: any, report: any) {
     const sheet = workbook.addWorksheet('Pump Sessions');
 
+    const MODE_LABELS: Record<string, string> = {
+      [PumpOperationMode.NORMAL]: 'Binh thuong',
+      [PumpOperationMode.SPRAY]: 'Phun mua',
+      [PumpOperationMode.ROOT]: 'Tuoi goc',
+      [PumpOperationMode.DRIP]: 'Nho giot',
+    };
+
     sheet.columns = [
       { header: 'Session #', key: 'sessionNumber', width: 12 },
+      { header: 'Operation Mode', key: 'operationMode', width: 16 },
       { header: 'Start', key: 'startedAt', width: 20 },
       { header: 'End', key: 'endedAt', width: 20 },
       { header: 'Duration (min)', key: 'duration', width: 15 },
@@ -710,6 +743,8 @@ export class PumpService {
     for (const session of report.sessions) {
       sheet.addRow({
         sessionNumber: session.sessionNumber,
+        operationMode:
+          MODE_LABELS[session.operationMode] || session.operationMode || '',
         startedAt: session.startedAt
           ? new Date(session.startedAt).toLocaleString('vi-VN')
           : '',

@@ -265,6 +265,8 @@
 │  │  │   ├── startSession(deviceId, sensorData)              │  │
 │  │  │   ├── stopSession(deviceId, status, reason)           │  │
 │  │  │   ├── @OnEvent('pump.started', 'pump.stopped', etc)  │  │
+│  │  │   │   └── Events emitted by SyncService from telemetry│  │
+│  │  │   │       (parses PUMP_STATUS field from payload)      │  │
 │  │  │   ├── @Interval(60_000) closeStaleSession             │  │
 │  │  │   │   └── Closes sessions with no data > 30s          │  │
 │  │  │   ├── getReport(deviceId) - summary + timeline        │  │
@@ -911,6 +913,6 @@ Trigger: ProvisionService.pairDevice()
 
 ---
 
-**Document Version:** 1.4
-**Last Updated:** 2026-03-16
-**Architecture Pattern:** NestJS 8 with MQTT + WebSocket dual transport + FCM push notifications + Farm-level subscriptions + Coffee price intelligence + Pump session tracking
+**Document Version:** 1.5
+**Last Updated:** 2026-03-18
+**Architecture Pattern:** NestJS 8 with MQTT + WebSocket dual transport + FCM push notifications + Farm-level subscriptions + Coffee price intelligence + Pump session tracking + Firmware OTA

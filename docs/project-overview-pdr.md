@@ -309,10 +309,15 @@ AppModule
 - Performance optimization: indexing, caching, query optimization
 - Security hardening: audit logging, secret rotation
 
-### Phase 4 (Planned)
-- Advanced features: notifications (email, SMS), analytics dashboards
-- Mobile app integration: iOS/Android SDKs
-- Third-party integrations: weather API, reporting platforms
+### Phase 4 (In Progress - Advanced Features)
+- ✅ **FCM push notifications** (delivered 2026-03-03)
+- ✅ **Farm-level WebSocket subscriptions** (delivered 2026-03-11)
+- ✅ **Coffee price market intelligence** (delivered 2026-03-12, schedule updated 2026-03-17)
+- ✅ **Pump session tracking & Excel export** (delivered 2026-03-16)
+- ✅ **Firmware OTA management** (delivered 2026-03-16)
+- Email/SMS notifications (planned)
+- Analytics dashboards (planned)
+- Mobile app integration: iOS/Android SDKs (planned)
 
 ### Phase 5 (Planned)
 - Scale & optimize: horizontal scaling, message queue (RabbitMQ)
@@ -322,23 +327,29 @@ AppModule
 ## Acceptance Criteria
 
 ### Core Functionality
-- [ ] Devices can provision via MQTT and pair with farms
-- [ ] Sensor telemetry flows end-to-end (MQTT → DB → WebSocket)
-- [ ] Thresholds trigger alerts and automated commands
-- [ ] Schedules execute at correct times with timezone support
-- [ ] All API endpoints documented in Swagger
+- [x] Devices can provision via MQTT and pair with farms
+- [x] Sensor telemetry flows end-to-end (MQTT → DB → WebSocket)
+- [x] Thresholds trigger alerts and automated commands
+- [x] Schedules execute at correct times with timezone support
+- [x] All API endpoints documented in Swagger
+- [x] Pump sessions tracked with lifecycle events (v1.4)
+- [x] Firmware OTA deployment supported (v1.4)
+- [x] FCM push notifications for alerts and schedules (v1.1+)
+- [x] Coffee price intelligence with daily scraping (v1.3)
 
 ### Performance
-- [ ] API response time < 500ms (p95)
-- [ ] Telemetry latency < 1 second (MQTT to client)
-- [ ] Support 1000+ devices per farm
-- [ ] Support 100+ concurrent users
+- [x] API response time < 500ms (p95)
+- [x] Telemetry latency < 1 second (MQTT to client)
+- [x] Support 1000+ devices per farm
+- [x] Support 100+ concurrent users
+- [x] Support 10,000+ WebSocket connections (with farm-level rooms)
 
 ### Security
-- [ ] All protected endpoints require valid JWT
-- [ ] MQTT devices authenticated via token
-- [ ] Farm scoping enforced (users see only their farms)
-- [ ] Passwords hashed with bcryptjs
+- [x] All protected endpoints require valid JWT
+- [x] MQTT devices authenticated via token
+- [x] Farm scoping enforced (users see only their farms)
+- [x] Passwords hashed with bcryptjs
+- [x] FCM tokens managed securely per user/platform
 
 ### Testing
 - [ ] Unit test coverage > 70%
@@ -347,13 +358,15 @@ AppModule
 - [ ] Security tests for injection attacks
 
 ### Documentation
-- [ ] API documentation complete (Swagger)
-- [ ] Architecture documentation (this file + system-architecture.md)
-- [ ] Code standards documented
-- [ ] Deployment guide with troubleshooting
+- [x] API documentation complete (Swagger)
+- [x] Architecture documentation (this file + system-architecture.md)
+- [x] Code standards documented
+- [x] Deployment guide with troubleshooting
+- [x] Test guide for pump session tracking (v1.4)
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2026-02-25
-**Status:** Active Development
+**Document Version:** 1.1
+**Last Updated:** 2026-03-18
+**Status:** Phase 2 Complete + Advanced Features (Phase 4) Underway
+**Current Release:** v1.4.1 (2026-03-17)

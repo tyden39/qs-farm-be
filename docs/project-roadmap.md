@@ -105,11 +105,12 @@ The IoT Farm Management Platform follows a phased development approach, progress
 - ✅ API coverage: 50+ endpoints
 - ✅ Entity relationships: Full referential integrity
 
-## Phase 3: Production Hardening (Planned - 0%)
+## Phase 3: Production Hardening (In Progress - 15%)
 
-### Status: PLANNED
+### Status: IN PROGRESS
 **Timeline:** March 2026 - April 2026 (estimated)
 **Priority:** High
+**Completion:** Milestone 1 started 2026-03-16 with pump and firmware modules
 
 ### Planned Features
 
@@ -170,11 +171,12 @@ The IoT Farm Management Platform follows a phased development approach, progress
 - [ ] Rate limiting prevents API abuse
 - [ ] Health checks pass for all services
 
-## Phase 4: Advanced Features (Planned - 0%)
+## Phase 4: Advanced Features (In Progress - 40%)
 
-### Status: PLANNED
-**Timeline:** May 2026 - July 2026 (estimated)
+### Status: IN PROGRESS
+**Timeline:** Originally May 2026 - July 2026, delivered early (features shipped in Phase 2-3)
 **Priority:** Medium
+**Completion Notes:** Advanced features delivered ahead of schedule, concurrent with Phase 2/3. Version progress: v1.1+ (FCM) → v1.2+ (Farm WS) → v1.3 (Coffee Price) → v1.4 (Pump & Firmware)
 
 ### Planned Features
 
@@ -444,11 +446,16 @@ Phase 1: Core Infrastructure
 
 ---
 
-**Document Version:** 1.4
-**Last Updated:** 2026-03-17
-**Phase 1-2 Status:** Complete
-**Phase 3-5 Status:** Planned (High confidence in Phase 3 timeline)
-**FCM Push:** Delivered early (2026-03-03), ahead of Phase 4 schedule
-**Farm-Level WebSocket:** Delivered (2026-03-11) with conditional FCM optimization
-**Coffee Price Intelligence:** Delivered (2026-03-12), schedule updated to noon (2026-03-17)
-**Pump Session Tracking:** Delivered (2026-03-16) with event-driven lifecycle and excel exports
+**Document Version:** 1.5
+**Last Updated:** 2026-03-18
+**Phase 1-2 Status:** Complete (100%)
+**Phase 3 Status:** In Progress (15% - Database indices, monitoring foundations)
+**Phase 4 Status:** In Progress (40% - Advanced features delivered ahead of schedule)
+**Phase 5 Status:** Planned
+**Release Timeline:**
+- v1.0 (2026-02-25): Phase 2 complete
+- v1.1 (2026-03-03): FCM push notifications
+- v1.2 (2026-03-11): Farm-level WebSocket subscriptions
+- v1.3 (2026-03-12): Coffee price market intelligence
+- v1.4 (2026-03-16): Pump session tracking & Firmware OTA
+- v1.4.1 (2026-03-17): Coffee price schedule optimized (noon daily)

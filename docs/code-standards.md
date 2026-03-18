@@ -648,6 +648,160 @@ export function infinityPagination<T>(
 }
 ```
 
+## Advanced Patterns (v1.4+)
+
+### Excel Export Pattern (Pump Module)
+- **Library:** ExcelJS for workbook generation
+- **Template format:** Define headers, styles, column widths
+- **Data export:** Stream data to client with proper MIME type
+```typescript
+@Get('report/:deviceId')
+async generatePumpReport(
+  @Param('deviceId') deviceId: string,
+  @Query() query: PumpReportQueryDto,
+  @Res() res: Response,
+) {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Pump Report');
+
+  // Define headers with styling
+  worksheet.columns = [
+    { header: 'Date', key: 'date', width: 15 },
+    { header: 'Status', key: 'status', width: 12 },
+    { header: 'Duration (s)', key: 'duration', width: 15 },
+  ];
+
+  // Add data rows
+  const sessions = await this.pumpService.getSessions(deviceId, query);
+  worksheet.addRows(sessions);
+
+  // Stream to client
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=pump-report.xlsx');
+  await workbook.xlsx.write(res);
+  res.end();
+}
+```
+
+### Puppeteer Scraping Pattern (Coffee Price)
+- **Headless browser:** Launch with specific args for Cloudflare handling
+- **Retry logic:** 3 attempts with exponential delays (0s, 30s, 60s)
+- **Error recovery:** Timeout handling and graceful degradation
+```typescript
+@Injectable()
+export class CoffeePriceService {
+  async scrapeGiacaphe(): Promise<CoffeePrice[]> {
+    let browser: Browser;
+    const maxRetries = 3;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        browser = await puppeteer.launch({
+          headless: true,
+          args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        });
+
+        const page = await browser.newPage();
+        await page.goto(GIACAPHE_URL, { waitUntil: 'networkidle2', timeout: 30000 });
+
+        const data = await page.evaluate(() => {
+          // Extract price data using Cheerio-style selectors
+          return document.querySelectorAll('.price-row').map(row => ({
+            market: row.querySelector('.market').textContent,
+            price: parseFloat(row.querySelector('.price').textContent),
+          }));
+        });
+
+        return data;
+      } catch (error) {
+        if (attempt < maxRetries - 1) {
+          const delay = attempt === 0 ? 0 : attempt * 30000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw error;
+        }
+      } finally {
+        if (browser) await browser.close();
+      }
+    }
+  }
+}
+```
+
+### Firebase Cloud Messaging Pattern (Notifications)
+- **Token management:** Register/unregister tokens per user/platform (ios/android)
+- **Conditional sending:** Skip push if user online (has active WebSocket)
+- **Batch operations:** Send to multiple users efficiently
+```typescript
+@Injectable()
+export class FcmService {
+  constructor(
+    @InjectRepository(DeviceToken)
+    private tokenRepository: Repository<DeviceToken>,
+  ) {}
+
+  async sendToFarmOwner(
+    farmId: string,
+    title: string,
+    body: string,
+    skipIfOnline: boolean = true,
+  ): Promise<void> {
+    const farm = await this.farmRepository.findOne(farmId);
+
+    // Skip if farm owner has active WebSocket
+    if (skipIfOnline && this.deviceGateway.isUserOnline(farm.userId)) {
+      return;
+    }
+
+    // Get all tokens for this user
+    const tokens = await this.tokenRepository.find({ userId: farm.userId });
+
+    const message = {
+      notification: { title, body },
+      tokens: tokens.map(t => t.token),
+    };
+
+    // Batch send
+    await this.firebaseAdmin.messaging().sendMulticast(message);
+  }
+}
+```
+
+### Scheduled Task Pattern (Coffee Price v1.3)
+- **Timezone support:** Use Intl.DateTimeFormat for timezone conversion
+- **Daily execution:** Schedule at specific time (noon Vietnam time)
+- **Interval-based processor:** @Interval with 60-second checks
+```typescript
+@Injectable()
+export class CoffeePriceScheduler {
+  private lastExecutionDate: string = null;
+
+  @Interval(60_000) // Check every 60 seconds
+  async processDailySchedule(): Promise<void> {
+    // Get current time in Vietnam timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const timeStr = formatter.format(new Date());
+    const [hours, minutes] = timeStr.split(':');
+
+    // Execute at 12:00 (noon)
+    if (hours === '12' && minutes === '00') {
+      const today = new Date().toISOString().split('T')[0];
+
+      // Prevent duplicate execution
+      if (this.lastExecutionDate !== today) {
+        this.lastExecutionDate = today;
+        await this.coffeePriceService.scrapeAndSave();
+      }
+    }
+  }
+}
+```
+
 ## Build & Deployment
 
 ### NestJS Build
@@ -667,6 +821,7 @@ yarn build    # Compiles src/ to dist/ with TypeScript
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2026-02-25
+**Document Version:** 1.1
+**Last Updated:** 2026-03-18
 **Target Audience:** All developers on the project
+**Recent Updates:** Added Excel export (Pump), Puppeteer scraping (Coffee Price), FCM integration (Notifications), and scheduled task patterns

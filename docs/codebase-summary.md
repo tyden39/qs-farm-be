@@ -2,19 +2,19 @@
 
 ## Overview
 
-**IoT Farm Management Platform** - NestJS 8 monolith with 13 feature modules, ~5,578 lines of TypeScript source code across 103 files. Combines REST APIs, MQTT IoT communication, and WebSocket real-time updates.
+**IoT Farm Management Platform** - NestJS 8 monolith with 14 feature modules, ~15,000+ lines of TypeScript source code across 137 files. Combines REST APIs, MQTT IoT communication, WebSocket real-time updates, and advanced features (FCM notifications, coffee price intelligence, pump session tracking).
 
 ## Project Statistics
 
 | Metric | Value |
 |--------|-------|
-| Total Source Files | 103 .ts files |
-| Total Lines of Code | ~5,578 LOC |
-| Number of Modules | 13 feature modules |
-| Entities | 14 TypeORM entities |
-| Endpoints | 50+ REST endpoints |
+| Total Source Files | 137 .ts files |
+| Total Lines of Code | ~15,000+ LOC |
+| Number of Modules | 14 feature modules |
+| Entities | 17 TypeORM entities |
+| Endpoints | 60+ REST endpoints |
 | WebSocket Events | 10+ Socket.IO events |
-| MQTT Topics | 6 topic patterns |
+| MQTT Topics | 8 topic patterns |
 
 ## Module Structure
 
@@ -140,6 +140,48 @@ src/
 │   └── entities/
 │       └── file.entity.ts                 # File metadata
 │
+├── pump/                                  # Pump Module (v1.4 - session tracking)
+│   ├── pump.module.ts                     # Module definition
+│   ├── pump.service.ts                    # Session lifecycle, Excel export, maintenance
+│   ├── pump.controller.ts                 # Report endpoints
+│   ├── entities/
+│   │   └── pump-session.entity.ts         # Session with 13 aggregate columns
+│   ├── dtos/
+│   │   └── pump-report.dto.ts             # Report query/response DTOs
+│   └── templates/
+│       └── pump-report.template.ts        # Excel format definitions
+│
+├── firmware/                              # Firmware Module (v1.4 - OTA updates)
+│   ├── firmware.module.ts                 # Module definition
+│   ├── firmware.service.ts                # Upload, versioning, deployment, MD5 checks
+│   ├── firmware.controller.ts             # Upload, check-update, deploy endpoints
+│   ├── entities/
+│   │   ├── firmware.entity.ts             # Firmware version with MD5 checksum
+│   │   └── firmware-update-log.entity.ts  # OTA deployment tracking
+│   └── dtos/
+│       ├── firmware-upload.dto.ts
+│       └── firmware-deploy.dto.ts
+│
+├── notification/                          # Notification Module (v1.1+ - FCM)
+│   ├── notification.module.ts             # Module definition
+│   ├── fcm.service.ts                     # Firebase Admin SDK integration
+│   ├── notification.controller.ts         # Token registration endpoint
+│   ├── entities/
+│   │   └── device-token.entity.ts         # FCM tokens per user/platform
+│   └── dtos/
+│       └── register-token.dto.ts
+│
+├── coffee-price/                          # Coffee Price Module (v1.3 - market intel)
+│   ├── coffee-price.module.ts             # Module definition
+│   ├── coffee-price.service.ts            # Puppeteer scraping, retry logic
+│   ├── coffee-price.controller.ts         # Price query endpoints
+│   ├── entities/
+│   │   └── coffee-price.entity.ts         # Daily market prices with date+market unique
+│   ├── dtos/
+│   │   └── coffee-price-query.dto.ts
+│   └── schedulers/
+│       └── coffee-price.scheduler.ts      # Daily noon scrape (Asia/Ho_Chi_Minh)
+│
 ├── utils/                                 # Utilities
 │   ├── pipes/
 │   │   └── validation.pipe.ts             # Global AutoValidationPipe
@@ -166,15 +208,20 @@ src/
 | User | `user/entities/user.entity.ts` | User accounts, auth | UUID |
 | ResetToken | `user/password-reset/entities/reset-token.entity.ts` | OTP & reset flow | UUID |
 | Farm | `farm/entities/farm.entity.ts` | Farm grouping | UUID |
-| Device | `device/entities/device.entity.ts` | IoT devices | UUID |
+| Device | `device/entities/device.entity.ts` | IoT devices (now with totalOperatingHours) | UUID |
 | PairingToken | `device/entities/pairing-token.entity.ts` | One-time pairing | UUID |
 | SensorConfig | `sensor/entities/sensor-config.entity.ts` | Sensor setup | UUID |
 | SensorThreshold | `sensor/entities/sensor-threshold.entity.ts` | Alert rules | UUID |
 | SensorData | `sensor/entities/sensor-data.entity.ts` | Readings (time-series) | bigint |
 | AlertLog | `sensor/entities/alert-log.entity.ts` | Alert history | UUID |
-| CommandLog | `sensor/entities/command-log.entity.ts` | Command audit | UUID |
+| CommandLog | `sensor/entities/command-log.entity.ts` | Command audit (MANUAL/AUTOMATED source) | UUID |
 | DeviceSchedule | `schedule/entities/device-schedule.entity.ts` | Scheduled commands | UUID |
 | File | `files/entities/file.entity.ts` | File metadata | UUID |
+| PumpSession | `pump/entities/pump-session.entity.ts` | Pump lifecycle tracking (ACTIVE/COMPLETED/INTERRUPTED) | UUID |
+| Firmware | `firmware/entities/firmware.entity.ts` | Firmware versions with MD5 checksums | UUID |
+| FirmwareUpdateLog | `firmware/entities/firmware-update-log.entity.ts` | OTA deployment tracking | UUID |
+| DeviceToken | `notification/entities/device-token.entity.ts` | FCM push notification tokens | UUID |
+| CoffeePrice | `coffee-price/entities/coffee-price.entity.ts` | Daily Vietnamese market prices | UUID |
 
 ## Critical Service Classes
 
@@ -191,16 +238,27 @@ src/
 
 ### Sensor & Threshold
 - **SensorService** (`src/sensor/sensor.service.ts`) - Sensor config, data aggregation, statistics, analytics
-- **ThresholdService** (`src/sensor/services/threshold.service.ts`) - Threshold evaluation, anti-spam, command dispatch
+- **ThresholdService** (`src/sensor/services/threshold.service.ts`) - Threshold evaluation, anti-spam, command dispatch, FCM notifications
 
 ### Scheduling
-- **ScheduleService** (`src/schedule/schedule.service.ts`) - Schedule CRUD, 60-second interval processor
+- **ScheduleService** (`src/schedule/schedule.service.ts`) - Schedule CRUD, 60-second interval processing, conditional FCM push
+- **CoffeePriceScheduler** (`src/coffee-price/schedulers/coffee-price.scheduler.ts`) - Daily noon scrape with retry logic
+
+### Pump Session Tracking
+- **PumpService** (`src/pump/pump.service.ts`) - Session lifecycle, event-driven tracking, Excel export, maintenance prediction
+
+### Firmware Management
+- **FirmwareService** (`src/firmware/firmware.service.ts`) - Version management, MD5 checksums, OTA deployment
+
+### Notifications
+- **FcmService** (`src/notification/fcm.service.ts`) - Firebase Admin SDK integration, token management, multi-platform push
+- **CoffeePriceService** (`src/coffee-price/coffee-price.service.ts`) - Puppeteer scraping, Cloudflare handling, data persistence
 
 ### EMQX Integration
 - **EmqxService** (`src/emqx/emqx.service.ts`) - MQTT auth validation, topic ACL enforcement
 
 ### Real-time Gateway
-- **DeviceGateway** (`src/device/gateway/device.gateway.ts`) - Socket.IO namespace, WebSocket room management
+- **DeviceGateway** (`src/device/gateway/device.gateway.ts`) - Socket.IO namespace, WebSocket room management (device + farm rooms)
 
 ## Dependency Graph
 
@@ -226,15 +284,32 @@ AppModule
 │   └── contains: MqttService, DeviceGateway, SyncService
 │
 ├── SensorModule                          (telemetry & alerts)
-│   ├── imports: DeviceModule
+│   ├── imports: DeviceModule, NotificationModule
 │   └── listens to: telemetry.received, command.dispatched events
 │
 ├── ScheduleModule                        (device scheduling)
-│   ├── imports: NestScheduleModule, DeviceModule
-│   └── 60-second interval processor
+│   ├── imports: NestScheduleModule, DeviceModule, NotificationModule
+│   └── 60-second interval processor with conditional FCM
 │
 ├── ProvisionModule                       (device pairing)
 │   └── imports: DeviceModule
+│
+├── PumpModule                            (pump session tracking - v1.4)
+│   ├── imports: DeviceModule
+│   ├── @OnEvent('pump.started', 'pump.stopped', 'pump.disconnected')
+│   └── Excel export, maintenance prediction
+│
+├── FirmwareModule                        (OTA updates - v1.4)
+│   └── Versioning, MD5 checksums, deployment tracking
+│
+├── NotificationModule                    (FCM pushes - v1.1+)
+│   ├── FcmService (Firebase Admin SDK)
+│   └── Token management per user/platform
+│
+├── CoffeePriceModule                     (market intelligence - v1.3)
+│   ├── imports: NestScheduleModule
+│   ├── Puppeteer scraping, retry logic
+│   └── Daily noon schedule (Asia/Ho_Chi_Minh timezone)
 │
 ├── EmqxModule                            (MQTT auth/ACL webhooks)
 │   └── imports: JwtModule
@@ -308,6 +383,22 @@ AppModule
 - `POST /upload` - Upload file (Multer)
 - `GET /:filename` - Download file (public)
 
+### Pump (`/api/pump` - v1.4)
+- `GET /report/:deviceId` - Pump session report (query: from, to, format=excel)
+
+### Firmware (`/api/firmware` - v1.4)
+- `POST /upload` - Upload firmware version with MD5 checksum
+- `GET /check-update` - Check for firmware updates available
+- `POST /deploy` - Deploy firmware to device (OTA)
+- `GET /logs/:deviceId` - Firmware update deployment logs
+
+### Notification (`/api/notification` - v1.1+)
+- `POST /register-token` - Register FCM push notification token
+
+### Coffee Price (`/api/coffee-price` - v1.3)
+- `GET` - Query daily prices (filters: date, market, limit=365 days max)
+- `GET /latest` - Get latest prices by market
+
 ### EMQX (`/api/emqx` - Webhook endpoints)
 - `POST /auth` - MQTT device authentication
 - `POST /acl` - Topic ACL validation
@@ -316,15 +407,19 @@ AppModule
 
 ### Client → Server (emit)
 - `subscribeToDevice` - Join `device:{id}` room
-- `unsubscribeFromDevice` - Leave room
+- `unsubscribeFromDevice` - Leave device room
+- `subscribeToFarm` - Join `farm:{id}` room (v1.2+, multi-device events)
+- `unsubscribeFromFarm` - Leave farm room
 - `sendCommand` - Send command to device
 
 ### Server → Client (broadcast)
-- `deviceData` - Telemetry update
-- `deviceStatus` - Device status change
-- `deviceAlert` - Threshold alert
+- `deviceData` - Telemetry update (broadcast to device + farm rooms)
+- `deviceStatus` - Device status change (broadcast to device + farm rooms)
+- `deviceAlert` - Threshold alert (broadcast to device + farm rooms)
 - `deviceProvisioned` - Provisioning complete
 - `devicePaired` - Device paired to farm
+- `pumpSessionStarted` - Pump session began (v1.4)
+- `pumpSessionStopped` - Pump session completed (v1.4)
 
 ## MQTT Topic Structure
 
@@ -334,8 +429,10 @@ AppModule
 | `provision/resp/{nonce}` | Backend → Device | Provisioning response with token |
 | `device/{id}/cmd` | Backend → Device | Command to device |
 | `device/{id}/status` | Device → Backend | Device status update |
-| `device/{id}/telemetry` | Device → Backend | Sensor telemetry data |
+| `device/{id}/telemetry` | Device → Backend | Sensor telemetry data (includes PUMP_STATUS for pump.started/stopped events) |
 | `device/{id}/resp` | Device → Backend | Command response |
+| `device/{id}/pump/session` | Device → Backend | Pump session lifecycle data (v1.4) |
+| `firmware/{id}/update` | Backend → Device | Firmware OTA update command (v1.4) |
 
 ## Code Patterns & Conventions
 
@@ -409,11 +506,14 @@ yarn format        # Prettier formatting
 
 ### Database Optimization
 - Indexes on: (deviceId, createdAt), (deviceId, sensorType, createdAt) for time-series
+- Indexes on: pump_session (deviceId, createdAt), coffee_price (date, market) for new modules
 - Unique constraints on device serial/IMEI, sensor config (deviceId, sensorType)
+- Unique constraint on coffee_price (date, market)
 - Bigint PK for SensorData (1B+ row capacity for time-series)
 
 ### Caching
 - Sensor config cache: 60-second TTL in-memory
+- FarmId cache (SyncService): 60-second TTL for reduced DB load
 - Device status: In-memory per-service
 - JWT secret: Loaded once at startup
 
@@ -429,6 +529,7 @@ yarn format        # Prettier formatting
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2026-02-25
-**Source LOC:** ~5,578 across 103 files
+**Document Version:** 1.1
+**Last Updated:** 2026-03-18
+**Source LOC:** ~15,000+ across 137 files
+**Latest Features:** Pump Session Tracking (v1.4), Firmware OTA (v1.4), Coffee Price Intelligence (v1.3), FCM Notifications (v1.1+), Farm-level WebSocket (v1.2+)
