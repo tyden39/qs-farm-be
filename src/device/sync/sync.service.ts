@@ -175,7 +175,8 @@ export class SyncService implements OnModuleInit {
           deviceId,
           farmId,
           timestamp,
-          operationMode: payload.mode || undefined,
+          irrigationMode: payload.mode || undefined,
+          controlMode: payload.controlMode || undefined,
         });
       } else if (payload.pumpStatus === 0) {
         this.eventEmitter.emit('pump.stopped', {

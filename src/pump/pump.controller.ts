@@ -30,7 +30,7 @@ export class PumpController {
   @ApiProduces('application/json', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   @ApiResponse({
     status: 200,
-    description: 'JSON report (default). `summary.modeBreakdown` shows session counts by operation mode (normal/spray/root/drip). Each session includes `operationMode` field.',
+    description: 'JSON report (default). `summary.modeBreakdown` shows session counts by irrigation mode (normal/spray/root/drip). Each session includes `irrigationMode` and `controlMode` fields.',
     schema: {
       example: {
         summary: {
@@ -74,7 +74,8 @@ export class PumpController {
             id: 'uuid',
             deviceId: 'uuid',
             sessionNumber: 10,
-            operationMode: 'drip',
+            irrigationMode: 'drip',
+            controlMode: 'manual',
             startedAt: '2026-03-18T08:00:00.000Z',
             endedAt: '2026-03-18T08:30:00.000Z',
             durationSeconds: 1800,

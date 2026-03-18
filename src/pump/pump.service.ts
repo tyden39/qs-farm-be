@@ -8,6 +8,7 @@ import { PumpSession } from './entities/pump-session.entity';
 import { PumpSessionStatus } from './enums/pump-session-status.enum';
 import { InterruptedReason } from './enums/interrupted-reason.enum';
 import { PumpOperationMode } from './enums/pump-operation-mode.enum';
+import { PumpControlMode } from './enums/pump-control-mode.enum';
 import { PumpReportQueryDto } from './dto/pump-report-query.dto';
 import { Device } from 'src/device/entities/device.entity';
 import { SensorData } from 'src/sensor/entities/sensor-data.entity';
@@ -23,7 +24,8 @@ export interface PumpStartedEvent {
   deviceId: string;
   farmId?: string;
   timestamp: Date;
-  operationMode?: string;
+  irrigationMode?: string;
+  controlMode?: string;
 }
 
 export interface PumpStoppedEvent {
@@ -87,20 +89,29 @@ export class PumpService {
 
       const sessionNumber = (maxResult?.max || 0) + 1;
 
-      // Validate operation mode (fallback to NORMAL if invalid/missing)
-      const validModes = Object.values(PumpOperationMode);
-      const operationMode = validModes.includes(
-        event.operationMode as PumpOperationMode,
+      // Validate irrigation mode (fallback to NORMAL if invalid/missing)
+      const validIrrigationModes = Object.values(PumpOperationMode);
+      const irrigationMode = validIrrigationModes.includes(
+        event.irrigationMode as PumpOperationMode,
       )
-        ? (event.operationMode as PumpOperationMode)
+        ? (event.irrigationMode as PumpOperationMode)
         : PumpOperationMode.NORMAL;
+
+      // Validate control mode (fallback to MANUAL if invalid/missing)
+      const validControlModes = Object.values(PumpControlMode);
+      const controlMode = validControlModes.includes(
+        event.controlMode as PumpControlMode,
+      )
+        ? (event.controlMode as PumpControlMode)
+        : PumpControlMode.MANUAL;
 
       // Create new session
       const session = this.pumpSessionRepo.create({
         deviceId,
         sessionNumber,
         startedAt: timestamp,
-        operationMode,
+        irrigationMode,
+        controlMode,
         status: PumpSessionStatus.ACTIVE,
       });
 
@@ -549,11 +560,11 @@ export class PumpService {
         .getRawOne(),
       this.pumpSessionRepo
         .createQueryBuilder('ps')
-        .select('ps.operationMode', 'mode')
+        .select('ps.irrigationMode', 'mode')
         .addSelect('COUNT(*)', 'count')
         .where('ps.deviceId = :deviceId', { deviceId })
         .andWhere('ps.startedAt >= :from AND ps.startedAt <= :to', { from, to })
-        .groupBy('ps.operationMode')
+        .groupBy('ps.irrigationMode')
         .getRawMany(),
     ]);
 
@@ -714,7 +725,8 @@ export class PumpService {
 
     sheet.columns = [
       { header: 'Session #', key: 'sessionNumber', width: 12 },
-      { header: 'Operation Mode', key: 'operationMode', width: 16 },
+      { header: 'Irrigation Mode', key: 'irrigationMode', width: 16 },
+      { header: 'Control Mode', key: 'controlMode', width: 14 },
       { header: 'Start', key: 'startedAt', width: 20 },
       { header: 'End', key: 'endedAt', width: 20 },
       { header: 'Duration (min)', key: 'duration', width: 15 },
@@ -739,12 +751,23 @@ export class PumpService {
       fgColor: { argb: 'FF4472C4' },
     };
 
+    const CONTROL_MODE_LABELS: Record<string, string> = {
+      [PumpControlMode.MANUAL]: 'Thu cong',
+      [PumpControlMode.AUTO]: 'Tu dong',
+      [PumpControlMode.SCHEDULE]: 'Hen gio',
+    };
+
     // Data rows
     for (const session of report.sessions) {
+
       sheet.addRow({
         sessionNumber: session.sessionNumber,
-        operationMode:
-          MODE_LABELS[session.operationMode] || session.operationMode || '',
+        irrigationMode:
+          MODE_LABELS[session.irrigationMode] || session.irrigationMode || '',
+        controlMode:
+          CONTROL_MODE_LABELS[session.controlMode] ||
+          session.controlMode ||
+          '',
         startedAt: session.startedAt
           ? new Date(session.startedAt).toLocaleString('vi-VN')
           : '',

@@ -12,6 +12,7 @@ import { Device } from 'src/device/entities/device.entity';
 import { PumpSessionStatus } from '../enums/pump-session-status.enum';
 import { InterruptedReason } from '../enums/interrupted-reason.enum';
 import { PumpOperationMode } from '../enums/pump-operation-mode.enum';
+import { PumpControlMode } from '../enums/pump-control-mode.enum';
 
 @Entity()
 @Index(['deviceId', 'startedAt'])
@@ -30,12 +31,21 @@ export class PumpSession {
   @Column({ type: 'int' })
   sessionNumber: number;
 
+  // Irrigation mode (loại tưới: phun mưa, gốc cây, nhỏ giọt, thông thường)
   @Column({
     type: 'enum',
     enum: PumpOperationMode,
     default: PumpOperationMode.NORMAL,
   })
-  operationMode: PumpOperationMode;
+  irrigationMode: PumpOperationMode;
+
+  // Control mode (nguồn điều khiển: thủ công, tự động, lịch hẹn)
+  @Column({
+    type: 'enum',
+    enum: PumpControlMode,
+    default: PumpControlMode.MANUAL,
+  })
+  controlMode: PumpControlMode;
 
   @Column({ type: 'timestamp' })
   startedAt: Date;
