@@ -19,23 +19,23 @@ export class CoffeePriceService {
     private readonly coffeePriceRepo: Repository<CoffeePrice>,
   ) {}
 
-  // Runs daily at noon (12:00 PM) Vietnam time
-  @Cron('0 12 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  // Runs every 2 hours Vietnam time
+  @Cron('0 */2 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async handleDailyScrape(): Promise<void> {
-    this.logger.log('Starting daily coffee price scrape');
+    this.logger.log('Starting coffee price scrape');
     for (let attempt = 0; attempt < this.MAX_RETRIES; attempt++) {
       try {
         if (this.RETRY_DELAYS[attempt] > 0) {
           await new Promise((r) => setTimeout(r, this.RETRY_DELAYS[attempt]));
         }
         await this.scrapeAndStore();
-        this.logger.log('Daily scrape completed successfully');
+        this.logger.log('Scrape completed successfully');
         return;
       } catch (error) {
         this.logger.error(`Attempt ${attempt + 1} failed: ${error.message}`);
       }
     }
-    this.logger.error('All scrape attempts failed — skipping today');
+    this.logger.error('All scrape attempts failed — skipping this cycle');
   }
 
   async scrapeAndStore(): Promise<void> {
