@@ -1,9 +1,10 @@
 import { IsEnum, IsOptional, IsNumber, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ThresholdLevel } from '../enums/threshold-level.enum';
+
+import { ThresholdLevel } from 'src/sensor/enums/threshold-level.enum';
 import { IrrigationMode } from 'src/shared/enums/irrigation-mode.enum';
 
-export class CreateSensorThresholdDto {
+export class CreateZoneThresholdDto {
   @ApiProperty({ enum: ThresholdLevel })
   @IsEnum(ThresholdLevel)
   level: ThresholdLevel;

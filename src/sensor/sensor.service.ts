@@ -22,12 +22,14 @@ import { QueryAlertSummaryDto } from './dto/query-alert-summary.dto';
 import { QueryCommandLogDto } from './dto/query-command-log.dto';
 import { QueryFarmComparisonDto } from './dto/query-farm-comparison.dto';
 import { ThresholdService } from './threshold.service';
+import { ConfigResolutionService } from 'src/zone/config-resolution.service';
 
 interface TelemetryEvent {
   deviceId: string;
   payload: any;
   timestamp: Date;
   farmId?: string;
+  zoneId?: string;
 }
 
 interface CommandDispatchedEvent {
@@ -62,6 +64,7 @@ export class SensorService {
     @InjectRepository(Device)
     private readonly deviceRepo: Repository<Device>,
     private readonly thresholdService: ThresholdService,
+    private readonly configResolution: ConfigResolutionService,
   ) {}
 
   // --- Telemetry Processing ---
@@ -106,6 +109,10 @@ export class SensorService {
       // farmId passed from SyncService via event (no DB query needed)
       const farmId = event.farmId;
 
+      // Resolve zone context + active config (irrigationMode)
+      const context = await this.configResolution.getDeviceContext(deviceId);
+      const resolvedConfig = this.configResolution.resolveConfig(context);
+
       // Evaluate thresholds for each reading
       for (const reading of readings) {
         const config = configs.find(
@@ -114,13 +121,24 @@ export class SensorService {
             c.enabled &&
             c.mode === SensorMode.AUTO,
         );
-        if (!config || !config.thresholds?.length) continue;
+        if (!config) continue;
+
+        // Resolve thresholds using zone/device fallback chain
+        const resolvedThresholds = this.configResolution.resolveThresholdsForSensor(
+          context,
+          config.thresholds || [],
+          reading.sensorType as SensorType,
+          resolvedConfig.irrigationMode,
+        );
+
+        if (resolvedThresholds.length === 0) continue;
 
         await this.thresholdService.evaluate(
           deviceId,
           farmId,
           config,
           reading.value,
+          resolvedThresholds,
         );
       }
     } catch (error) {
@@ -206,6 +224,7 @@ export class SensorService {
     });
     const saved = await this.sensorThresholdRepo.save(threshold);
     this.invalidateCache(config.deviceId);
+    this.configResolution.invalidateCache(config.deviceId);
     return saved;
   }
 
@@ -225,7 +244,10 @@ export class SensorService {
 
     Object.assign(threshold, dto);
     const saved = await this.sensorThresholdRepo.save(threshold);
-    if (config) this.invalidateCache(config.deviceId);
+    if (config) {
+      this.invalidateCache(config.deviceId);
+      this.configResolution.invalidateCache(config.deviceId);
+    }
     return saved;
   }
 
@@ -240,7 +262,10 @@ export class SensorService {
     });
 
     await this.sensorThresholdRepo.remove(threshold);
-    if (config) this.invalidateCache(config.deviceId);
+    if (config) {
+      this.invalidateCache(config.deviceId);
+      this.configResolution.invalidateCache(config.deviceId);
+    }
   }
 
   // --- Sensor Data Queries ---

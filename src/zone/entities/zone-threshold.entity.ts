@@ -9,29 +9,24 @@ import {
   Unique,
 } from 'typeorm';
 
-import { SensorConfig } from './sensor-config.entity';
-import { ThresholdLevel } from '../enums/threshold-level.enum';
+import { ZoneSensorConfig } from './zone-sensor-config.entity';
+import { ThresholdLevel } from 'src/sensor/enums/threshold-level.enum';
 import { IrrigationMode } from 'src/shared/enums/irrigation-mode.enum';
 
 @Entity()
-@Unique(['sensorConfigId', 'level', 'irrigationMode'])
-export class SensorThreshold {
+@Unique(['zoneSensorConfigId', 'level', 'irrigationMode'])
+export class ZoneThreshold {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column('uuid')
-  sensorConfigId: string;
+  zoneSensorConfigId: string;
 
-  @ManyToOne(() => SensorConfig, (config) => config.thresholds, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'sensorConfigId' })
-  sensorConfig: SensorConfig;
+  @ManyToOne(() => ZoneSensorConfig, (zsc) => zsc.thresholds, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'zoneSensorConfigId' })
+  zoneSensorConfig: ZoneSensorConfig;
 
-  @Column({
-    type: 'enum',
-    enum: ThresholdLevel,
-  })
+  @Column({ type: 'enum', enum: ThresholdLevel })
   level: ThresholdLevel;
 
   @Column({ type: 'enum', enum: IrrigationMode, nullable: true })

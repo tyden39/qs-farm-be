@@ -18,7 +18,7 @@ export class FarmService {
     const where = userId ? { userId } : {};
     const farms = await this.farmRepository.find({
       where,
-      relations: ['devices'],
+      relations: ['devices', 'zones'],
     });
 
     return farms;
@@ -26,7 +26,7 @@ export class FarmService {
 
   async findOne(id: string) {
     const farm = await this.farmRepository.findOne(id, {
-      relations: ['devices', 'user'],
+      relations: ['devices', 'zones', 'user'],
     });
 
     if (!farm) {

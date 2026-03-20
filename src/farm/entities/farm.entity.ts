@@ -9,6 +9,7 @@ import {
 
 import { User } from 'src/user/entities/user.entity';
 import { Device } from 'src/device/entities/device.entity';
+import type { Zone } from 'src/zone/entities/zone.entity';
 
 @Entity()
 export class Farm {
@@ -28,6 +29,12 @@ export class Farm {
   @JoinColumn({ name: 'userId' })
   user: User;
 
+  @Column({ type: 'jsonb', default: [] })
+  coordinates: { lat: number; lng: number }[];
+
   @OneToMany(() => Device, (device: Device) => device.farm)
   devices: Array<Device>;
+
+  @OneToMany('Zone', (zone: any) => zone.farm)
+  zones: Zone[];
 }

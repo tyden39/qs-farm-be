@@ -12,6 +12,7 @@ import { ThresholdLevel } from './enums/threshold-level.enum';
 import { SENSOR_REASON_MAP } from './constants/threshold-rules';
 import { SENSOR_TYPE_LABEL } from './enums/sensor-type.enum';
 import { FcmService } from 'src/notification/fcm.service';
+import type { ResolvedThreshold } from 'src/zone/config-resolution.service';
 
 const THRESHOLD_LEVEL_LABEL: Record<string, string> = {
   critical: 'Nguy hiểm',
@@ -67,8 +68,12 @@ export class ThresholdService {
     farmId: string | undefined,
     config: SensorConfig,
     value: number,
+    resolvedThresholds?: ResolvedThreshold[],
   ) {
-    const { sensorType, thresholds } = config;
+    const { sensorType } = config;
+
+    // Use resolved thresholds if provided (zone/device fallback chain), else raw config thresholds
+    const thresholds = resolvedThresholds ?? config.thresholds ?? [];
 
     // Sort: CRITICAL first, then WARNING
     const sorted = [...thresholds].sort((a, b) => {
@@ -257,7 +262,7 @@ export class ThresholdService {
     }
 
     // No violation — clear state for this sensor's actions
-    this.clearStatesForSensor(deviceId, config);
+    this.clearStatesForSensor(deviceId, thresholds);
   }
 
   private shouldDispatch(
@@ -289,11 +294,11 @@ export class ThresholdService {
     return true;
   }
 
-  private clearStatesForSensor(deviceId: string, config: SensorConfig) {
+  private clearStatesForSensor(deviceId: string, thresholds: { action: string }[]) {
     const deviceStateMap = this.deviceStates.get(deviceId);
     if (!deviceStateMap) return;
 
-    for (const threshold of config.thresholds) {
+    for (const threshold of thresholds) {
       deviceStateMap.delete(threshold.action);
     }
   }

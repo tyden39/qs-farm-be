@@ -10,6 +10,7 @@ import {
 
 import { Device } from 'src/device/entities/device.entity';
 import { Farm } from 'src/farm/entities/farm.entity';
+import type { Zone } from 'src/zone/entities/zone.entity';
 
 export enum ScheduleType {
   RECURRING = 'recurring',
@@ -43,6 +44,13 @@ export class DeviceSchedule {
   @ManyToOne(() => Farm, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'farmId' })
   farm: Farm;
+
+  @Column('uuid', { nullable: true })
+  zoneId: string;
+
+  @ManyToOne('Zone', { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'zoneId' })
+  zone: Zone;
 
   @Column({ length: 100 })
   command: string;

@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 
 import { Device } from './entities/device.entity';
+import { Zone } from 'src/zone/entities/zone.entity';
 import { DeviceController } from './device.controller';
 import { DeviceService } from './device.service';
 import { FilesModule } from 'src/files/files.module';
@@ -14,7 +15,7 @@ import { UserModule } from 'src/user/user.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Device]),
+    TypeOrmModule.forFeature([Device, Zone]),
     FilesModule,
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET,

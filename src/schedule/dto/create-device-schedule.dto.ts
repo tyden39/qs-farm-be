@@ -37,6 +37,11 @@ export class CreateDeviceScheduleDto {
   @IsUUID()
   farmId?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  zoneId?: string;
+
   @ApiProperty({ maxLength: 100 })
   @IsString()
   @MaxLength(100)

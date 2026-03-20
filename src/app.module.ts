@@ -18,6 +18,7 @@ import { FirmwareModule } from './firmware/firmware.module';
 import { NotificationModule } from './notification/notification.module';
 import { CoffeePriceModule } from './coffee-price/coffee-price.module';
 import { PumpModule } from './pump/pump.module';
+import { ZoneModule } from './zone/zone.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { PumpModule } from './pump/pump.module';
     NotificationModule,
     CoffeePriceModule,
     PumpModule,
+    ZoneModule,
   ],
   providers: [],
 })

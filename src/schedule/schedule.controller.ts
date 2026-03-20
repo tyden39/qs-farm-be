@@ -23,12 +23,15 @@ export class ScheduleController {
   constructor(private readonly scheduleService: ScheduleService) {}
 
   @Get()
+  @ApiQuery({ name: 'deviceId', required: false })
   @ApiQuery({ name: 'farmId', required: false })
+  @ApiQuery({ name: 'zoneId', required: false })
   findAll(
     @Query('deviceId') deviceId?: string,
     @Query('farmId') farmId?: string,
+    @Query('zoneId') zoneId?: string,
   ) {
-    return this.scheduleService.findAll(deviceId, farmId);
+    return this.scheduleService.findAll(deviceId, farmId, zoneId);
   }
 
   @Get(':id')

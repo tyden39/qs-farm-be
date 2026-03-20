@@ -14,10 +14,10 @@ import { Device } from '../entities/device.entity';
 export class SyncService implements OnModuleInit {
   private readonly logger = new Logger(SyncService.name);
 
-  // deviceId → farmId cache (60s TTL)
-  private farmIdCache: Map<
+  // deviceId → { farmId, zoneId } cache (60s TTL)
+  private deviceContextCache: Map<
     string,
-    { farmId: string | null; loadedAt: number }
+    { farmId: string | null; zoneId: string | null; loadedAt: number }
   > = new Map();
   private readonly FARM_CACHE_TTL = 60_000;
 
@@ -101,15 +101,19 @@ export class SyncService implements OnModuleInit {
     }
   }
 
-  private async getFarmId(deviceId: string): Promise<string | null> {
-    const cached = this.farmIdCache.get(deviceId);
+  private async getDeviceIds(deviceId: string): Promise<{ farmId: string | null; zoneId: string | null }> {
+    const cached = this.deviceContextCache.get(deviceId);
     if (cached && Date.now() - cached.loadedAt < this.FARM_CACHE_TTL) {
-      return cached.farmId;
+      return { farmId: cached.farmId, zoneId: cached.zoneId };
     }
     const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
-    const farmId = device?.farmId ?? null;
-    this.farmIdCache.set(deviceId, { farmId, loadedAt: Date.now() });
-    return farmId;
+    const entry = {
+      farmId: device?.farmId ?? null,
+      zoneId: device?.zoneId ?? null,
+      loadedAt: Date.now(),
+    };
+    this.deviceContextCache.set(deviceId, entry);
+    return { farmId: entry.farmId, zoneId: entry.zoneId };
   }
 
   /**
@@ -120,7 +124,7 @@ export class SyncService implements OnModuleInit {
 
     this.logger.debug(`Processing device status from ${deviceId}`);
 
-    const farmId = await this.getFarmId(deviceId);
+    const { farmId } = await this.getDeviceIds(deviceId);
 
     this.deviceGateway.broadcastDeviceStatus(
       deviceId,
@@ -149,7 +153,7 @@ export class SyncService implements OnModuleInit {
 
     this.logger.debug(`Processing telemetry from ${deviceId}`);
 
-    const farmId = await this.getFarmId(deviceId);
+    const { farmId, zoneId } = await this.getDeviceIds(deviceId);
 
     this.deviceGateway.broadcastDeviceData(
       deviceId,
@@ -166,6 +170,7 @@ export class SyncService implements OnModuleInit {
       payload,
       timestamp,
       farmId,
+      zoneId,
     });
 
     // Pump status events
@@ -199,7 +204,7 @@ export class SyncService implements OnModuleInit {
       `Device response from ${deviceId}: command=${payload.command} success=${payload.success}`,
     );
 
-    const farmId = await this.getFarmId(deviceId);
+    const { farmId } = await this.getDeviceIds(deviceId);
 
     this.deviceGateway.broadcastDeviceStatus(
       deviceId,
@@ -234,7 +239,7 @@ export class SyncService implements OnModuleInit {
   async sendCommandToDevice(deviceId: string, command: string, params: any) {
     this.logger.log(`Sending command to device ${deviceId}: ${command}`);
 
-    const farmId = await this.getFarmId(deviceId);
+    const { farmId } = await this.getDeviceIds(deviceId);
 
     try {
       await this.mqttService.publishToDevice(deviceId, command, params);

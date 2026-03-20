@@ -13,6 +13,7 @@ import { SensorService } from './sensor.service';
 import { SensorController } from './sensor.controller';
 import { ThresholdService } from './threshold.service';
 import { NotificationModule } from 'src/notification/notification.module';
+import { ZoneModule } from 'src/zone/zone.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { NotificationModule } from 'src/notification/notification.module';
     ]),
     DeviceModule,
     NotificationModule,
+    ZoneModule,
   ],
   controllers: [SensorController],
   providers: [SensorService, ThresholdService],

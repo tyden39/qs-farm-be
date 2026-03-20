@@ -1,5 +1,2 @@
-export enum PumpControlMode {
-  AUTO = 'auto', // Tự động (qua ngưỡng cảm biến)
-  MANUAL = 'manual', // Thủ công (qua REST API / WebSocket)
-  SCHEDULE = 'schedule', // Lịch hẹn giờ
-}
+// Re-exported from shared for backward compatibility
+export { ControlMode as PumpControlMode } from 'src/shared/enums/control-mode.enum';

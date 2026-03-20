@@ -2,6 +2,78 @@
 
 All notable changes to the IoT Farm Management Platform are documented in this file.
 
+## Version 1.5 (2026-03-20)
+
+### Added: Zone Hierarchy & Config Inheritance
+
+**Feature:** Multi-level farm organization with inherited sensor configurations and zone-level controls
+
+- **New Module:** ZoneModule with service, controller, entity, enums
+- **Zone Entity:** Represents farm subdivisions with coordinates (jsonb polygon), irrigation mode, control mode
+- **Config Inheritance Chain:** Device → Zone → Farm with soft override via checkAll toggle
+- **Zone Sensor Configs:** Template sensor configurations at zone level for device inheritance
+- **Zone Thresholds:** Per-irrigationMode threshold sets for inherited device monitoring
+- **Config Resolution Service:** Runtime resolution of active config/thresholds using fallback chain (device → zone)
+- **Zone Caching:** 60s TTL cache for device context (device + zone + zone configs)
+- **Zone-Level Controls:**
+  - Zone pump toggle: broadcast PUMP_ON/PUMP_OFF to all zone devices
+  - Zone schedules: execute commands on all devices in zone
+- **Device Enhancements:**
+  - Added zoneId (nullable for backward compat)
+  - Added latitude, longitude floats for device GPS
+  - Added irrigationMode, controlMode (overridable per device)
+- **Farm Enhancements:** Added coordinates (jsonb) for farm-level geography
+- **Schedule Enhancement:** Support for zone-level targeting (XOR: deviceId | farmId | zoneId)
+- **SensorThreshold Enhancement:** Added irrigationMode column for mode-aware thresholds
+- **Sensor Pipeline Integration:** Updated telemetry processing to use resolved configs/thresholds
+- **New Enums:**
+  - IrrigationMode: NORMAL, SPRAY, ROOT, DRIP
+  - ControlMode: AUTO, MANUAL, SCHEDULE
+- **REST API:**
+  - `GET/POST/PATCH/DELETE /api/zone` - zone CRUD
+  - `GET/POST/PATCH/DELETE /api/zone/:id/sensor-config` - zone sensor config CRUD
+  - `GET/POST/PATCH/DELETE /api/zone/:id/sensor-config/:configId/threshold` - zone threshold CRUD
+  - `POST /api/zone/:id/pump` - zone pump toggle
+- **Dependencies:** No new external dependencies
+
+**Files Created:**
+- `src/shared/enums/irrigation-mode.enum.ts`
+- `src/shared/enums/control-mode.enum.ts`
+- `src/zone/entities/zone.entity.ts`
+- `src/zone/entities/zone-sensor-config.entity.ts`
+- `src/zone/entities/zone-threshold.entity.ts`
+- `src/zone/zone.module.ts`
+- `src/zone/zone.service.ts`
+- `src/zone/zone.controller.ts`
+- `src/zone/zone-sensor-config.service.ts`
+- `src/zone/config-resolution.service.ts`
+- `src/zone/dto/` (coordinate, create/update zone, create/update zone-sensor-config, create/update zone-threshold)
+
+**Files Modified:**
+- `src/farm/entities/farm.entity.ts` - added coordinates, zones relation
+- `src/device/entities/device.entity.ts` - added zoneId, lat/lng, irrigationMode, controlMode
+- `src/sensor/entities/sensor-threshold.entity.ts` - added irrigationMode, updated unique constraint
+- `src/schedule/entities/device-schedule.entity.ts` - added zoneId
+- `src/pump/enums/` - re-exported from shared
+- `src/farm/dto/` - added coordinates
+- `src/device/dto/` - added zone fields
+- `src/device/device.service.ts` - farmId sync on zone change
+- `src/sensor/sensor.service.ts` - integrated ConfigResolutionService
+- `src/sensor/threshold.service.ts` - accepts resolved thresholds
+- `src/device/sync/sync.service.ts` - caches zoneId, passes in events
+- `src/schedule/schedule.service.ts` - zone support in execute/findAll/validate
+- `src/app.module.ts` - registered ZoneModule
+
+**Technical Highlights:**
+- Zero-downtime schema migration (TypeORM synchronize with nullable zoneId)
+- Multi-level inheritance with soft override semantics
+- Aggressive caching (60s TTL) for high-frequency telemetry path
+- Fallback threshold resolution: device(mode) → device(null) → zone(mode) → zone(null)
+- Zone-level broadcast enables farm region management
+- Backward compatible (existing devices without zone continue to work)
+
+---
+
 ## Version 1.4.1 (2026-03-17)
 
 ### Updated: Coffee Price Intelligence Scheduling
@@ -259,5 +331,5 @@ All notable changes to the IoT Farm Management Platform are documented in this f
 ---
 
 **Changelog Maintained By:** Documentation Management System
-**Last Updated:** 2026-03-17
+**Last Updated:** 2026-03-20
 **Format:** Semantic Versioning (MAJOR.MINOR.PATCH)

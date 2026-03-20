@@ -1,4 +1,7 @@
-import { IsString, IsOptional, IsUUID, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsNumber, IsEnum } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IrrigationMode } from 'src/shared/enums/irrigation-mode.enum';
+import { ControlMode } from 'src/shared/enums/control-mode.enum';
 
 export class CreateDeviceDto {
   @IsString()
@@ -21,6 +24,31 @@ export class CreateDeviceDto {
 
   @IsUUID()
   readonly farmId: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  readonly zoneId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  readonly latitude?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  readonly longitude?: number;
+
+  @ApiPropertyOptional({ enum: IrrigationMode })
+  @IsOptional()
+  @IsEnum(IrrigationMode)
+  readonly irrigationMode?: IrrigationMode;
+
+  @ApiPropertyOptional({ enum: ControlMode })
+  @IsOptional()
+  @IsEnum(ControlMode)
+  readonly controlMode?: ControlMode;
 
   @IsOptional()
   @IsNumber()

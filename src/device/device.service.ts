@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { Device } from './entities/device.entity';
+import { Zone } from 'src/zone/entities/zone.entity';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 
@@ -12,6 +13,8 @@ export class DeviceService {
   constructor(
     @InjectRepository(Device)
     private readonly deviceRepository: Repository<Device>,
+    @InjectRepository(Zone)
+    private readonly zoneRepository: Repository<Zone>,
   ) {}
 
   async findAll(farmId?: string) {
@@ -53,6 +56,12 @@ export class DeviceService {
 
     if (!device) {
       throw new NotFoundException(`There is no device under id ${id}`);
+    }
+
+    // Sync farmId when zoneId changes
+    if (updateDeviceDto.zoneId) {
+      const zone = await this.zoneRepository.findOne({ where: { id: updateDeviceDto.zoneId } });
+      if (zone) device.farmId = zone.farmId;
     }
 
     return this.deviceRepository.save(device);

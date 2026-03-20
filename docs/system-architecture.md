@@ -111,6 +111,42 @@
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
+│  │ Zone Module (Farm Subdivision & Config Inheritance)        │  │
+│  │  ├── imports: DeviceModule, FilesModule                  │  │
+│  │  ├── exports: ZoneService, ConfigResolutionService      │  │
+│  │  │                                                         │  │
+│  │  ├── ZoneService (CRUD for zones)                         │  │
+│  │  │   ├── findAllByFarm(farmId)                             │  │
+│  │  │   ├── create/update/remove operations                  │  │
+│  │  │   └── togglePump(zoneId, action) - broadcast to all   │  │
+│  │  │       devices in zone                                  │  │
+│  │  │                                                         │  │
+│  │  ├── ZoneSensorConfigService (zone template configs)      │  │
+│  │  │   ├── CRUD for ZoneSensorConfig entities               │  │
+│  │  │   └── CRUD for ZoneThreshold entities                  │  │
+│  │  │                                                         │  │
+│  │  ├── ConfigResolutionService (runtime inheritance)        │  │
+│  │  │   ├── getDeviceContext() - load device + zone + zone  │  │
+│  │  │     configs with 60s cache                             │  │
+│  │  │   ├── resolveConfig() - pick active irrigationMode +  │  │
+│  │  │     controlMode using checkAll logic                  │  │
+│  │  │   ├── resolveThresholdsForSensor() - fallback chain:   │  │
+│  │  │     device(mode) → device(null) → zone(mode) →        │  │
+│  │  │     zone(null)                                          │  │
+│  │  │   └── invalidateCache(deviceId/zoneId)                │  │
+│  │  │                                                         │  │
+│  │  ├── Zone entity (1:M with Device, 1:M with Farm)        │  │
+│  │  ├── ZoneSensorConfig entity (zone sensor templates)      │  │
+│  │  ├── ZoneThreshold entity (zone thresholds per sensor)    │  │
+│  │  └── Zone endpoints:                                       │  │
+│  │      GET/POST/PATCH/DELETE /api/zone                      │  │
+│  │      GET/POST/PATCH/DELETE /api/zone/:id/sensor-config   │  │
+│  │      GET/POST/PATCH/DELETE /api/zone/:id/threshold       │  │
+│  │      POST /api/zone/:id/pump                              │  │
+│  │                                                         │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                   │
+│  ┌────────────────────────────────────────────────────────────┐  │
 │  │ Device Module (Core IoT)                                   │  │
 │  │  ├── imports: JwtModule, ProvisionModule                  │  │
 │  │  ├── exports: MqttService, DeviceGateway, SyncService     │  │
@@ -344,8 +380,26 @@
 │ name: str        │
 │ location: str    │
 │ userId: UUID (FK)│
+│ coordinates:jsonb│
 │ createdAt        │
 └────────┬─────────┘
+         │ (1:M)
+         │
+         ▼
+┌──────────────────────────────────┐
+│         Zone                      │
+├──────────────────────────────────┤
+│ id: UUID (PK)                    │
+│ name: str                        │
+│ image: str                       │
+│ farmId: UUID (FK)                │
+│ coordinates: jsonb               │
+│ irrigationMode: enum             │
+│ controlMode: enum                │
+│ checkAll: bool                   │
+│ pumpEnabled: bool                │
+│ createdAt, updatedAt             │
+└────────┬─────────────────────────┘
          │ (1:M)
          │
          ▼
@@ -357,8 +411,12 @@
 │ imei: str (unique)               │
 │ serial: str (unique)             │
 │ status: enum                     │
-│ deviceToken: str                 │
 │ farmId: UUID (FK)                │
+│ zoneId: UUID (FK, nullable)      │
+│ latitude, longitude: float       │
+│ irrigationMode: enum (nullable)  │
+│ controlMode: enum (nullable)     │
+│ deviceToken: str                 │
 │ operatingLifeHours: float        │
 │ totalOperatingHours: float       │
 │ provisionedAt, pairedAt          │
@@ -390,9 +448,40 @@
 │ level: enum (WARNING)    │
 │ type: enum (MIN/MAX)     │
 │ threshold: float         │
+│ irrigationMode: enum (opt)│
 │ action: str              │
-│ unique(config,           │
-│ level, type)             │
+│ unique(config, level,    │
+│ irrigationMode)          │
+└──────────────────────────┘
+
+┌──────────────────────────┐
+│ ZoneSensorConfig         │
+├──────────────────────────┤
+│ id: UUID (PK)            │
+│ zoneId: UUID (FK)        │
+│ sensorType: enum         │
+│ enabled: bool            │
+│ mode: enum (AUTO)        │
+│ unit: str (opt)          │
+│ unique(zoneId, sensorType)
+│ createdAt, updatedAt     │
+└────────┬─────────────────┘
+         │ (1:M)
+         │
+         ▼
+┌──────────────────────────┐
+│ ZoneThreshold            │
+├──────────────────────────┤
+│ id: UUID (PK)            │
+│ zoneSensorConfigId: FK   │
+│ level: enum (CRITICAL)   │
+│ irrigationMode: enum (opt)│
+│ minThreshold: float (opt)│
+│ maxThreshold: float (opt)│
+│ action: str              │
+│ unique(config, level,    │
+│ irrigationMode)          │
+│ createdAt, updatedAt     │
 └──────────────────────────┘
 
 ┌─────────────────────────┐
@@ -417,6 +506,7 @@
 │ type: enum (RECURRING)  │
 │ deviceId: FK (XOR)      │
 │ farmId: FK (XOR)        │
+│ zoneId: FK (XOR)        │
 │ command: str            │
 │ params: JSONB           │
 │ daysOfWeek: int[]       │
@@ -913,6 +1003,6 @@ Trigger: ProvisionService.pairDevice()
 
 ---
 
-**Document Version:** 1.5
-**Last Updated:** 2026-03-18
-**Architecture Pattern:** NestJS 8 with MQTT + WebSocket dual transport + FCM push notifications + Farm-level subscriptions + Coffee price intelligence + Pump session tracking + Firmware OTA
+**Document Version:** 1.6
+**Last Updated:** 2026-03-20
+**Architecture Pattern:** NestJS 8 with MQTT + WebSocket dual transport + FCM push notifications + Farm-level subscriptions + Zone hierarchy + Config inheritance + Coffee price intelligence + Pump session tracking

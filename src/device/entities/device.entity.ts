@@ -11,6 +11,9 @@ import {
 
 import { Farm } from 'src/farm/entities/farm.entity';
 import { SensorConfig } from 'src/sensor/entities/sensor-config.entity';
+import { IrrigationMode } from 'src/shared/enums/irrigation-mode.enum';
+import { ControlMode } from 'src/shared/enums/control-mode.enum';
+import type { Zone } from 'src/zone/entities/zone.entity';
 
 export enum DeviceStatus {
   PENDING = 'pending',
@@ -70,6 +73,25 @@ export class Device {
   @ManyToOne(() => Farm, (farm: Farm) => farm.devices)
   @JoinColumn({ name: 'farmId' })
   farm: Farm;
+
+  @Column('uuid', { nullable: true })
+  zoneId: string;
+
+  @ManyToOne('Zone', (zone: any) => zone.devices, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'zoneId' })
+  zone: Zone;
+
+  @Column({ type: 'float', nullable: true })
+  latitude: number;
+
+  @Column({ type: 'float', nullable: true })
+  longitude: number;
+
+  @Column({ type: 'enum', enum: IrrigationMode, nullable: true })
+  irrigationMode: IrrigationMode;
+
+  @Column({ type: 'enum', enum: ControlMode, nullable: true })
+  controlMode: ControlMode;
 
   @OneToMany(() => SensorConfig, (sc) => sc.device)
   sensorConfigs: SensorConfig[];

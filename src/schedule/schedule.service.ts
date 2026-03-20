@@ -19,6 +19,7 @@ import { DeviceService } from 'src/device/device.service';
 import { DeviceGateway } from 'src/device/websocket/device.gateway';
 import { FcmService } from 'src/notification/fcm.service';
 import { Farm } from 'src/farm/entities/farm.entity';
+import { Zone } from 'src/zone/entities/zone.entity';
 
 @Injectable()
 export class ScheduleService {
@@ -35,6 +36,8 @@ export class ScheduleService {
     private readonly scheduleRepository: Repository<DeviceSchedule>,
     @InjectRepository(Farm)
     private readonly farmRepo: Repository<Farm>,
+    @InjectRepository(Zone)
+    private readonly zoneRepo: Repository<Zone>,
     private readonly syncService: SyncService,
     private readonly deviceService: DeviceService,
     private readonly deviceGateway: DeviceGateway,
@@ -55,10 +58,11 @@ export class ScheduleService {
     return farm.userId;
   }
 
-  async findAll(deviceId?: string, farmId?: string) {
+  async findAll(deviceId?: string, farmId?: string, zoneId?: string) {
     const where: any = {};
     if (deviceId) where.deviceId = deviceId;
     if (farmId) where.farmId = farmId;
+    if (zoneId) where.zoneId = zoneId;
 
     return this.scheduleRepository.find({
       where,
@@ -75,7 +79,7 @@ export class ScheduleService {
   }
 
   async create(dto: CreateDeviceScheduleDto) {
-    this.validateTarget(dto.deviceId, dto.farmId);
+    this.validateTarget(dto.deviceId, dto.farmId, dto.zoneId);
     this.validateScheduleFields(dto.type, dto);
 
     const schedule = this.scheduleRepository.create(dto);
@@ -85,10 +89,11 @@ export class ScheduleService {
   async update(id: string, dto: UpdateDeviceScheduleDto) {
     const existing = await this.findOne(id);
 
-    if (dto.deviceId !== undefined || dto.farmId !== undefined) {
+    if (dto.deviceId !== undefined || dto.farmId !== undefined || dto.zoneId !== undefined) {
       this.validateTarget(
         dto.deviceId ?? existing.deviceId,
         dto.farmId ?? existing.farmId,
+        dto.zoneId ?? existing.zoneId,
       );
     }
 
@@ -110,12 +115,11 @@ export class ScheduleService {
     return this.scheduleRepository.save(schedule);
   }
 
-  private validateTarget(deviceId?: string, farmId?: string) {
-    const hasDevice = !!deviceId;
-    const hasFarm = !!farmId;
-    if (hasDevice === hasFarm) {
+  private validateTarget(deviceId?: string, farmId?: string, zoneId?: string) {
+    const count = [deviceId, farmId, zoneId].filter(Boolean).length;
+    if (count !== 1) {
       throw new BadRequestException(
-        'Exactly one of deviceId or farmId must be provided',
+        'Exactly one of deviceId, farmId, or zoneId must be provided',
       );
     }
   }
@@ -239,6 +243,26 @@ export class ScheduleService {
           schedule.command,
           schedule.params,
         );
+      } else if (schedule.zoneId) {
+        const zone = await this.zoneRepo.findOne({
+          where: { id: schedule.zoneId },
+          relations: ['devices'],
+        });
+        if (zone) {
+          for (const device of zone.devices) {
+            try {
+              await this.syncService.sendCommandToDevice(
+                device.id,
+                schedule.command,
+                schedule.params,
+              );
+            } catch (err) {
+              this.logger.warn(
+                `Failed to send command to device ${device.id} for zone schedule ${schedule.id}: ${err.message}`,
+              );
+            }
+          }
+        }
       } else if (schedule.farmId) {
         const devices = await this.deviceService.findAll(schedule.farmId);
         for (const device of devices) {
@@ -268,9 +292,12 @@ export class ScheduleService {
     }
     await this.scheduleRepository.save(schedule);
 
-    // Push notification for schedule execution
+    // Push notification for schedule execution — resolve farmId from zone if needed
     const farmId =
       schedule.farmId ||
+      (schedule.zoneId
+        ? (await this.zoneRepo.findOne({ where: { id: schedule.zoneId } }))?.farmId
+        : null) ||
       (schedule.deviceId
         ? (await this.deviceService.findOne(schedule.deviceId))?.farmId
         : null);
