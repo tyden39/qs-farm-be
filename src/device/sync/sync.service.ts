@@ -216,6 +216,30 @@ export class SyncService implements OnModuleInit {
       farmId,
     );
 
+    // Update device pumpEnabled state on PUMP_ON/PUMP_OFF feedback
+    if (
+      (payload.command === 'PUMP_ON' || payload.command === 'PUMP_OFF') &&
+      payload.success
+    ) {
+      const pumpEnabled = payload.command === 'PUMP_ON';
+      await this.deviceRepo.update(deviceId, { pumpEnabled });
+      this.logger.log(
+        `Device ${deviceId} pumpEnabled updated to ${pumpEnabled}`,
+      );
+
+      // Notify mobile of state change
+      this.deviceGateway.broadcastDeviceStatus(
+        deviceId,
+        {
+          type: 'pumpStateChanged',
+          pumpEnabled,
+          command: payload.command,
+          timestamp: new Date().toISOString(),
+        },
+        farmId,
+      );
+    }
+
     // Detect firmware OTA_UPDATE response
     if (payload.command === 'OTA_UPDATE') {
       this.logger.log(

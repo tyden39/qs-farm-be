@@ -93,6 +93,9 @@ export class Device {
   @Column({ type: 'enum', enum: ControlMode, nullable: true })
   controlMode: ControlMode;
 
+  @Column({ type: 'boolean', default: false })
+  pumpEnabled: boolean;
+
   @OneToMany(() => SensorConfig, (sc) => sc.device)
   sensorConfigs: SensorConfig[];
 

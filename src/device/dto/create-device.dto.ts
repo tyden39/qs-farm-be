@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsUUID, IsNumber, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsNumber, IsEnum, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IrrigationMode } from 'src/shared/enums/irrigation-mode.enum';
 import { ControlMode } from 'src/shared/enums/control-mode.enum';
@@ -53,4 +53,9 @@ export class CreateDeviceDto {
   @IsOptional()
   @IsNumber()
   readonly operatingLifeHours?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  readonly pumpEnabled?: boolean;
 }
