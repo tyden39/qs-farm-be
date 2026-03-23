@@ -224,9 +224,12 @@ export class PumpService {
         return;
       }
 
-      // endedAt = last sensor data timestamp for this device
+      // endedAt = last sensor data timestamp for this device (must not precede session start)
       const lastData = await this.getLastSensorTimestamp(deviceId);
-      const endedAt = lastData || event.timestamp;
+      const endedAt =
+        lastData && lastData > session.startedAt
+          ? lastData
+          : event.timestamp;
 
       await this.closeSession(
         session,
@@ -281,8 +284,10 @@ export class PumpService {
     session.endedAt = endedAt;
     session.status = status;
     session.interruptedReason = reason || null;
-    session.durationSeconds =
-      (endedAt.getTime() - session.startedAt.getTime()) / 1000;
+    session.durationSeconds = Math.max(
+      0,
+      (endedAt.getTime() - session.startedAt.getTime()) / 1000,
+    );
 
     // Compute sensor aggregates
     await this.computeSessionAggregates(session);
@@ -490,9 +495,12 @@ export class PumpService {
 
           // If no data at all, or last data is older than 30s
           if (!lastDataTime || now - lastDataTime > STALE_THRESHOLD_MS) {
-            const endedAt = lastDataTime
-              ? new Date(lastDataTime)
-              : session.startedAt;
+            const lastDataDate = lastDataTime ? new Date(lastDataTime) : null;
+            // Ensure endedAt >= startedAt to avoid negative durationSeconds
+            const endedAt =
+              lastDataDate && lastDataDate > session.startedAt
+                ? lastDataDate
+                : session.startedAt;
 
             await this.closeSession(
               session,
