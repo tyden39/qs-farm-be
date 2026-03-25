@@ -2,6 +2,31 @@
 
 All notable changes to the IoT Farm Management Platform are documented in this file.
 
+## Version 1.5.1 (2026-03-25)
+
+### Added: Fertilizer Machine Support
+
+**Feature:** Optional fertilizer machine (máy bón phân) management for devices
+
+- **New Fields:** `hasFertilizer` (feature flag) and `fertilizerEnabled` (state) on Device entity
+- **API:** Both fields optional in create/update DTO, Swagger documented
+- **Guard Logic:** SyncService rejects `fertilizer_*` commands if device `hasFertilizer=false`
+- **State Sync:** MQTT responses (FERTILIZER_ON/FERTILIZER_OFF) update `fertilizerEnabled` + broadcast WebSocket events
+- **Command Logging:** Fertilizer commands logged via existing CommandLog infrastructure (MQTT topic: `device/{deviceId}/cmd`)
+- **Device Provisioning:** No changes — fertilizer disabled by default, enabled via PATCH /devices/:id
+- **Scheduling:** Fertilizer schedules reuse DeviceSchedule (no new entity)
+- **Sensor Integration:** Fertilizer state changes emit telemetry events, compatible with sensor threshold pipeline
+- **Tests:** 4 unit tests covering guard + state sync scenarios
+- **Files Modified:**
+  - `src/device/entities/device.entity.ts` - added hasFertilizer, fertilizerEnabled columns
+  - `src/device/dto/create-device.dto.ts` - added DTO fields with validation
+  - `src/device/sync/sync.service.ts` - fertilizer guard + FERTILIZER_ON/OFF handler
+  - `src/device/sync/sync.service.spec.ts` - new unit tests
+- **Backward Compatibility:** Zero-downtime migration (TypeORM sync); existing devices unaffected (defaults to false)
+- **Status:** Build verified, all tests pass, code reviewed
+
+---
+
 ## Version 1.5 (2026-03-20)
 
 ### Added: Zone Hierarchy & Config Inheritance

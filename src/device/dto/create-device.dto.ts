@@ -58,4 +58,14 @@ export class CreateDeviceDto {
   @IsOptional()
   @IsBoolean()
   readonly pumpEnabled?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  readonly hasFertilizer?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  readonly fertilizerEnabled?: boolean;
 }

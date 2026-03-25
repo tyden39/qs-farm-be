@@ -96,6 +96,12 @@ export class Device {
   @Column({ type: 'boolean', default: false })
   pumpEnabled: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  hasFertilizer: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  fertilizerEnabled: boolean;
+
   @OneToMany(() => SensorConfig, (sc) => sc.device)
   sensorConfigs: SensorConfig[];
 

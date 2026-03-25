@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -240,6 +240,29 @@ export class SyncService implements OnModuleInit {
       );
     }
 
+    // Update device fertilizerEnabled state on FERTILIZER_ON/FERTILIZER_OFF feedback
+    if (
+      (payload.command === 'FERTILIZER_ON' || payload.command === 'FERTILIZER_OFF') &&
+      payload.success
+    ) {
+      const fertilizerEnabled = payload.command === 'FERTILIZER_ON';
+      await this.deviceRepo.update(deviceId, { fertilizerEnabled });
+      this.logger.log(
+        `Device ${deviceId} fertilizerEnabled updated to ${fertilizerEnabled}`,
+      );
+
+      this.deviceGateway.broadcastDeviceStatus(
+        deviceId,
+        {
+          type: 'fertilizerStateChanged',
+          fertilizerEnabled,
+          command: payload.command,
+          timestamp: new Date().toISOString(),
+        },
+        farmId,
+      );
+    }
+
     // Detect firmware OTA_UPDATE response
     if (payload.command === 'OTA_UPDATE') {
       this.logger.log(
@@ -264,6 +287,16 @@ export class SyncService implements OnModuleInit {
     this.logger.log(`Sending command to device ${deviceId}: ${command}`);
 
     const { farmId } = await this.getDeviceIds(deviceId);
+
+    // Guard: fertilizer commands require hasFertilizer=true on the device
+    if (command.startsWith('fertilizer_')) {
+      const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
+      if (!device?.hasFertilizer) {
+        throw new BadRequestException(
+          `Device ${deviceId} does not have a fertilizer machine`,
+        );
+      }
+    }
 
     try {
       await this.mqttService.publishToDevice(deviceId, command, params);
