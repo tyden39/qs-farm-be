@@ -142,6 +142,11 @@ export class SyncService implements OnModuleInit {
         farmId,
         timestamp,
       });
+      this.eventEmitter.emit('fertilizer.disconnected', {
+        deviceId,
+        farmId,
+        timestamp,
+      });
     }
   }
 
@@ -188,6 +193,25 @@ export class SyncService implements OnModuleInit {
           deviceId,
           farmId,
           sessionId: payload.sessionId || null,
+          timestamp,
+        });
+      }
+    }
+
+    // Fertilizer status events (fertStatus key distinguishes from pump)
+    if (payload.fertStatus !== undefined) {
+      if (payload.fertStatus === 1) {
+        this.eventEmitter.emit('fertilizer.started', {
+          deviceId,
+          farmId,
+          timestamp,
+          controlMode: payload.fertControlMode || undefined,
+        });
+      } else if (payload.fertStatus === 0) {
+        this.eventEmitter.emit('fertilizer.stopped', {
+          deviceId,
+          farmId,
+          sessionId: payload.fertSessionId || null,
           timestamp,
         });
       }

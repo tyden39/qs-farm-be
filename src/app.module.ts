@@ -18,6 +18,7 @@ import { FirmwareModule } from './firmware/firmware.module';
 import { NotificationModule } from './notification/notification.module';
 import { CoffeePriceModule } from './coffee-price/coffee-price.module';
 import { PumpModule } from './pump/pump.module';
+import { FertilizerModule } from './fertilizer/fertilizer.module';
 import { ZoneModule } from './zone/zone.module';
 
 @Module({
@@ -50,6 +51,7 @@ import { ZoneModule } from './zone/zone.module';
     NotificationModule,
     CoffeePriceModule,
     PumpModule,
+    FertilizerModule,
     ZoneModule,
   ],
   providers: [],

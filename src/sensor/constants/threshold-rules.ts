@@ -32,4 +32,20 @@ export const SENSOR_REASON_MAP: Record<
     belowMin: 'Trạng thái bơm thấp',
     aboveMax: 'Trạng thái bơm cao',
   },
+  [SensorType.FERT_TEMPERATURE]: {
+    belowMin: 'Nhiệt độ máy phân thấp',
+    aboveMax: 'Nhiệt độ máy phân quá cao',
+  },
+  [SensorType.FERT_CURRENT]: {
+    belowMin: 'Dòng điện máy phân thấp',
+    aboveMax: 'Quá dòng điện máy phân',
+  },
+  [SensorType.FERT_PHASE]: {
+    belowMin: 'Lỗi pha điện máy phân',
+    aboveMax: 'Quá điện áp pha máy phân',
+  },
+  [SensorType.FERT_STATUS]: {
+    belowMin: 'Trạng thái máy phân thấp',
+    aboveMax: 'Trạng thái máy phân cao',
+  },
 };
