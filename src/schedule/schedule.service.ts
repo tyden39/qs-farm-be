@@ -22,6 +22,7 @@ import { Farm } from 'src/farm/entities/farm.entity';
 import { Zone } from 'src/zone/entities/zone.entity';
 import { Device } from 'src/device/entities/device.entity';
 import { IrrigationMode } from 'src/shared/enums/irrigation-mode.enum';
+import { ControlMode } from 'src/shared/enums/control-mode.enum';
 import { ConfigResolutionService } from 'src/zone/config-resolution.service';
 
 @Injectable()
@@ -32,6 +33,10 @@ export class ScheduleService {
   // Commands that change irrigation mode and require threshold profile re-sync
   private static readonly MODE_CHANGE_COMMANDS = new Set([
     'SET_IRRIGATION_MODE',
+  ]);
+
+  // Commands that change control mode
+  private static readonly CONTROL_MODE_COMMANDS = new Set([
     'SET_MODE',
   ]);
 
@@ -294,6 +299,8 @@ export class ScheduleService {
 
       // Sync irrigationMode in DB so threshold evaluation uses the new profile
       await this.applyModeChange(schedule);
+      // Sync controlMode in DB
+      await this.applyControlModeChange(schedule);
     } catch (error) {
       this.logger.error(
         `Failed to execute schedule ${schedule.id}: ${error.message}`,
@@ -341,6 +348,29 @@ export class ScheduleService {
           `Skipping FCM for schedule ${schedule.id} — user ${farmOwnerId} is online`,
         );
       }
+    }
+  }
+
+  /**
+   * When a schedule sends SET_MODE, update controlMode in DB immediately.
+   */
+  private async applyControlModeChange(schedule: DeviceSchedule): Promise<void> {
+    if (!ScheduleService.CONTROL_MODE_COMMANDS.has(schedule.command)) return;
+
+    const modeValue = schedule.params?.mode;
+    if (!modeValue || !Object.values(ControlMode).includes(modeValue)) return;
+
+    const controlMode = modeValue as ControlMode;
+
+    if (schedule.zoneId) {
+      await this.zoneRepo.update(schedule.zoneId, { controlMode });
+      this.logger.log(`Applied controlMode="${controlMode}" to zone ${schedule.zoneId}`);
+    } else if (schedule.deviceId) {
+      await this.deviceRepo.update(schedule.deviceId, { controlMode });
+      this.logger.log(`Applied controlMode="${controlMode}" to device ${schedule.deviceId}`);
+    } else if (schedule.farmId) {
+      await this.deviceRepo.update({ farmId: schedule.farmId }, { controlMode });
+      this.logger.log(`Applied controlMode="${controlMode}" to all devices in farm ${schedule.farmId}`);
     }
   }
 

@@ -289,22 +289,20 @@ export class SyncService implements OnModuleInit {
       );
     }
 
-    // Update device irrigationMode + controlMode on SET_IRRIGATION_MODE / SET_MODE confirmation
-    if (
-      (payload.command === 'SET_IRRIGATION_MODE' || payload.command === 'SET_MODE') &&
-      payload.success
-    ) {
-      const irrModeValue = payload.irrigationMode ?? payload.mode;
-      if (irrModeValue && Object.values(IrrigationMode).includes(irrModeValue)) {
-        const irrigationMode = irrModeValue as IrrigationMode;
+    // SET_IRRIGATION_MODE: { command, success, irrigationMode } → update irrigationMode
+    if (payload.command === 'SET_IRRIGATION_MODE' && payload.success) {
+      const irrigationMode = payload.irrigationMode as IrrigationMode;
+      if (irrigationMode && Object.values(IrrigationMode).includes(irrigationMode)) {
         await this.deviceRepo.update(deviceId, { irrigationMode });
         this.eventEmitter.emit('device.mode.changed', { deviceId, irrigationMode });
         this.logger.log(`Device ${deviceId} irrigationMode updated to ${irrigationMode}`);
       }
+    }
 
-      const ctrlModeValue = payload.mode ?? payload.controlMode;
-      if (ctrlModeValue && Object.values(ControlMode).includes(ctrlModeValue)) {
-        const controlMode = ctrlModeValue as ControlMode;
+    // SET_MODE: { command, success, mode } → update controlMode
+    if (payload.command === 'SET_MODE' && payload.success) {
+      const controlMode = payload.mode as ControlMode;
+      if (controlMode && Object.values(ControlMode).includes(controlMode)) {
         await this.deviceRepo.update(deviceId, { controlMode });
         this.logger.log(`Device ${deviceId} controlMode updated to ${controlMode}`);
       }
