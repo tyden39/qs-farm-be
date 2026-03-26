@@ -6,6 +6,8 @@ import { MqttService, MqttMessage } from '../mqtt/mqtt.service';
 import { DeviceGateway } from '../websocket/device.gateway';
 import { ProvisionService } from 'src/provision/provision.service';
 import { Device } from '../entities/device.entity';
+import { IrrigationMode } from 'src/shared/enums/irrigation-mode.enum';
+import { ControlMode } from 'src/shared/enums/control-mode.enum';
 
 /**
  * Sync Service - Bridge between MQTT (devices) and WebSocket (mobile apps)
@@ -285,6 +287,27 @@ export class SyncService implements OnModuleInit {
         },
         farmId,
       );
+    }
+
+    // Update device irrigationMode + controlMode on SET_IRRIGATION_MODE / SET_MODE confirmation
+    if (
+      (payload.command === 'SET_IRRIGATION_MODE' || payload.command === 'SET_MODE') &&
+      payload.success
+    ) {
+      const irrModeValue = payload.irrigationMode ?? payload.mode;
+      if (irrModeValue && Object.values(IrrigationMode).includes(irrModeValue)) {
+        const irrigationMode = irrModeValue as IrrigationMode;
+        await this.deviceRepo.update(deviceId, { irrigationMode });
+        this.eventEmitter.emit('device.mode.changed', { deviceId, irrigationMode });
+        this.logger.log(`Device ${deviceId} irrigationMode updated to ${irrigationMode}`);
+      }
+
+      const ctrlModeValue = payload.mode ?? payload.controlMode;
+      if (ctrlModeValue && Object.values(ControlMode).includes(ctrlModeValue)) {
+        const controlMode = ctrlModeValue as ControlMode;
+        await this.deviceRepo.update(deviceId, { controlMode });
+        this.logger.log(`Device ${deviceId} controlMode updated to ${controlMode}`);
+      }
     }
 
     // Detect firmware OTA_UPDATE response

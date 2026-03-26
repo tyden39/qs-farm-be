@@ -20,11 +20,20 @@ import { DeviceGateway } from 'src/device/websocket/device.gateway';
 import { FcmService } from 'src/notification/fcm.service';
 import { Farm } from 'src/farm/entities/farm.entity';
 import { Zone } from 'src/zone/entities/zone.entity';
+import { Device } from 'src/device/entities/device.entity';
+import { IrrigationMode } from 'src/shared/enums/irrigation-mode.enum';
+import { ConfigResolutionService } from 'src/zone/config-resolution.service';
 
 @Injectable()
 export class ScheduleService {
   private readonly logger = new Logger(ScheduleService.name);
   private executing = false;
+
+  // Commands that change irrigation mode and require threshold profile re-sync
+  private static readonly MODE_CHANGE_COMMANDS = new Set([
+    'SET_IRRIGATION_MODE',
+    'SET_MODE',
+  ]);
 
   // farmId → farm owner userId cache (5min TTL)
   private farmOwnerCache: Map<string, { userId: string; loadedAt: number }> =
@@ -38,10 +47,13 @@ export class ScheduleService {
     private readonly farmRepo: Repository<Farm>,
     @InjectRepository(Zone)
     private readonly zoneRepo: Repository<Zone>,
+    @InjectRepository(Device)
+    private readonly deviceRepo: Repository<Device>,
     private readonly syncService: SyncService,
     private readonly deviceService: DeviceService,
     private readonly deviceGateway: DeviceGateway,
     private readonly fcmService: FcmService,
+    private readonly configResolution: ConfigResolutionService,
   ) {}
 
   private async getFarmOwnerId(farmId: string): Promise<string | null> {
@@ -279,6 +291,9 @@ export class ScheduleService {
           }
         }
       }
+
+      // Sync irrigationMode in DB so threshold evaluation uses the new profile
+      await this.applyModeChange(schedule);
     } catch (error) {
       this.logger.error(
         `Failed to execute schedule ${schedule.id}: ${error.message}`,
@@ -326,6 +341,43 @@ export class ScheduleService {
           `Skipping FCM for schedule ${schedule.id} — user ${farmOwnerId} is online`,
         );
       }
+    }
+  }
+
+  /**
+   * When a schedule sends a mode-change command, update irrigationMode in DB
+   * so that subsequent telemetry evaluation uses the correct threshold profile.
+   */
+  private async applyModeChange(schedule: DeviceSchedule): Promise<void> {
+    if (!ScheduleService.MODE_CHANGE_COMMANDS.has(schedule.command)) return;
+
+    // Support both param key conventions: { mode } or { irrigationMode }
+    const modeValue = schedule.params?.mode ?? schedule.params?.irrigationMode;
+    if (!modeValue || !Object.values(IrrigationMode).includes(modeValue)) return;
+
+    const irrigationMode = modeValue as IrrigationMode;
+
+    if (schedule.zoneId) {
+      await this.zoneRepo.update(schedule.zoneId, { irrigationMode });
+      this.configResolution.invalidateCacheByZone(schedule.zoneId);
+      this.logger.log(
+        `Applied irrigationMode="${irrigationMode}" to zone ${schedule.zoneId}`,
+      );
+    } else if (schedule.deviceId) {
+      await this.deviceRepo.update(schedule.deviceId, { irrigationMode });
+      this.configResolution.invalidateCache(schedule.deviceId);
+      this.logger.log(
+        `Applied irrigationMode="${irrigationMode}" to device ${schedule.deviceId}`,
+      );
+    } else if (schedule.farmId) {
+      await this.deviceRepo.update({ farmId: schedule.farmId }, { irrigationMode });
+      const devices = await this.deviceService.findAll(schedule.farmId);
+      for (const device of devices) {
+        this.configResolution.invalidateCache(device.id);
+      }
+      this.logger.log(
+        `Applied irrigationMode="${irrigationMode}" to all devices in farm ${schedule.farmId}`,
+      );
     }
   }
 }

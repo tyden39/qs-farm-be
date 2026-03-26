@@ -352,6 +352,14 @@ export class SensorService {
     return this.alertLogRepo.save(alert);
   }
 
+  // --- Mode Change (from device response confirmation) ---
+
+  @OnEvent('device.mode.changed')
+  handleDeviceModeChanged(event: { deviceId: string }) {
+    this.invalidateCache(event.deviceId);
+    this.configResolution.invalidateCache(event.deviceId);
+  }
+
   // --- Command Log (manual commands via event) ---
 
   @OnEvent('command.dispatched')
