@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsUUID, IsNumber, IsEnum, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsUUID,
+  IsNumber,
+  IsEnum,
+  IsBoolean,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IrrigationMode } from 'src/shared/enums/irrigation-mode.enum';
 import { ControlMode } from 'src/shared/enums/control-mode.enum';

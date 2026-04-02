@@ -36,7 +36,11 @@ export class Zone {
   @Column({ type: 'jsonb', default: [] })
   coordinates: { lat: number; lng: number }[];
 
-  @Column({ type: 'enum', enum: IrrigationMode, default: IrrigationMode.NORMAL })
+  @Column({
+    type: 'enum',
+    enum: IrrigationMode,
+    default: IrrigationMode.NORMAL,
+  })
   irrigationMode: IrrigationMode;
 
   @Column({ type: 'enum', enum: ControlMode, default: ControlMode.MANUAL })

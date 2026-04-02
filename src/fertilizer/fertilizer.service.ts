@@ -150,7 +150,11 @@ export class FertilizerService {
           return;
         }
 
-        await this.closeSession(session, timestamp, FertilizerSessionStatus.COMPLETED);
+        await this.closeSession(
+          session,
+          timestamp,
+          FertilizerSessionStatus.COMPLETED,
+        );
       } else {
         session = await this.fertSessionRepo.findOne({
           where: { deviceId, status: FertilizerSessionStatus.ACTIVE },
@@ -381,7 +385,9 @@ export class FertilizerService {
   }
 
   // Use only fertilizer sensor types to avoid pump data interference
-  private async getLastFertSensorTimestamp(deviceId: string): Promise<Date | null> {
+  private async getLastFertSensorTimestamp(
+    deviceId: string,
+  ): Promise<Date | null> {
     const result = await this.sensorDataRepo
       .createQueryBuilder('sd')
       .select('MAX(sd.createdAt)', 'lastAt')

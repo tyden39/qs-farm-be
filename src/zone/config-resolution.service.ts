@@ -36,7 +36,10 @@ export class ConfigResolutionService {
   private readonly CACHE_TTL = 60_000;
 
   // deviceId → { data, loadedAt }
-  private cache: Map<string, { data: ResolvedDeviceContext; loadedAt: number }> = new Map();
+  private cache: Map<
+    string,
+    { data: ResolvedDeviceContext; loadedAt: number }
+  > = new Map();
 
   constructor(
     @InjectRepository(Device)
@@ -156,10 +159,17 @@ export class ConfigResolutionService {
     const t = thresholds.find(
       (th) =>
         th.level === level &&
-        (irrigationMode === null ? th.irrigationMode == null : th.irrigationMode === irrigationMode),
+        (irrigationMode === null
+          ? th.irrigationMode == null
+          : th.irrigationMode === irrigationMode),
     );
     if (!t) return null;
-    return { minThreshold: t.minThreshold, maxThreshold: t.maxThreshold, action: t.action, level: t.level };
+    return {
+      minThreshold: t.minThreshold,
+      maxThreshold: t.maxThreshold,
+      action: t.action,
+      level: t.level,
+    };
   }
 
   private findZoneThreshold(
@@ -170,10 +180,17 @@ export class ConfigResolutionService {
     const t = thresholds.find(
       (th) =>
         th.level === level &&
-        (irrigationMode === null ? th.irrigationMode == null : th.irrigationMode === irrigationMode),
+        (irrigationMode === null
+          ? th.irrigationMode == null
+          : th.irrigationMode === irrigationMode),
     );
     if (!t) return null;
-    return { minThreshold: t.minThreshold, maxThreshold: t.maxThreshold, action: t.action, level: t.level };
+    return {
+      minThreshold: t.minThreshold,
+      maxThreshold: t.maxThreshold,
+      action: t.action,
+      level: t.level,
+    };
   }
 
   invalidateCache(deviceId: string): void {

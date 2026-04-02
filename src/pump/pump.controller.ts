@@ -27,10 +27,14 @@ export class PumpController {
       'Returns pump session history with summary stats, maintenance info, timeline, and per-session details. Use `format=excel` to download as .xlsx file.',
   })
   @ApiParam({ name: 'deviceId', description: 'Device UUID', type: 'string' })
-  @ApiProduces('application/json', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  @ApiProduces(
+    'application/json',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
   @ApiResponse({
     status: 200,
-    description: 'JSON report (default). `summary.modeBreakdown` shows session counts by irrigation mode (normal/spray/root/drip). Each session includes `irrigationMode` and `controlMode` fields.',
+    description:
+      'JSON report (default). `summary.modeBreakdown` shows session counts by irrigation mode (normal/spray/root/drip). Each session includes `irrigationMode` and `controlMode` fields.',
     schema: {
       example: {
         summary: {
@@ -87,7 +91,8 @@ export class PumpController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Excel file download when `format=excel`. Includes "Operation Mode" column with Vietnamese labels (Bình thường / Phun mưa / Tưới gốc / Nhỏ giọt).',
+    description:
+      'Excel file download when `format=excel`. Includes "Operation Mode" column with Vietnamese labels (Bình thường / Phun mưa / Tưới gốc / Nhỏ giọt).',
     content: {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
         schema: { type: 'string', format: 'binary' },

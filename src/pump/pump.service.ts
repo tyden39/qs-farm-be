@@ -227,9 +227,7 @@ export class PumpService {
       // endedAt = last sensor data timestamp for this device (must not precede session start)
       const lastData = await this.getLastSensorTimestamp(deviceId);
       const endedAt =
-        lastData && lastData > session.startedAt
-          ? lastData
-          : event.timestamp;
+        lastData && lastData > session.startedAt ? lastData : event.timestamp;
 
       await this.closeSession(
         session,
@@ -767,15 +765,12 @@ export class PumpService {
 
     // Data rows
     for (const session of report.sessions) {
-
       sheet.addRow({
         sessionNumber: session.sessionNumber,
         irrigationMode:
           MODE_LABELS[session.irrigationMode] || session.irrigationMode || '',
         controlMode:
-          CONTROL_MODE_LABELS[session.controlMode] ||
-          session.controlMode ||
-          '',
+          CONTROL_MODE_LABELS[session.controlMode] || session.controlMode || '',
         startedAt: session.startedAt
           ? new Date(session.startedAt).toLocaleString('vi-VN')
           : '',

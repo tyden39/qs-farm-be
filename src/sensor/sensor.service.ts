@@ -124,12 +124,13 @@ export class SensorService {
         if (!config) continue;
 
         // Resolve thresholds using zone/device fallback chain
-        const resolvedThresholds = this.configResolution.resolveThresholdsForSensor(
-          context,
-          config.thresholds || [],
-          reading.sensorType as SensorType,
-          resolvedConfig.irrigationMode,
-        );
+        const resolvedThresholds =
+          this.configResolution.resolveThresholdsForSensor(
+            context,
+            config.thresholds || [],
+            reading.sensorType as SensorType,
+            resolvedConfig.irrigationMode,
+          );
 
         if (resolvedThresholds.length === 0) continue;
 

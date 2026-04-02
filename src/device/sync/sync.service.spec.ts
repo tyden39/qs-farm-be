@@ -56,7 +56,11 @@ describe('SyncService — fertilizer guard', () => {
   describe('sendCommandToDevice', () => {
     it('throws BadRequestException when hasFertilizer=false and command is fertilizer_on', async () => {
       // deviceRepo.findOne is called twice: once for getDeviceIds cache miss, once for fertilizer guard
-      mockDeviceRepo.findOne.mockResolvedValue({ farmId: 'farm-1', zoneId: null, hasFertilizer: false });
+      mockDeviceRepo.findOne.mockResolvedValue({
+        farmId: 'farm-1',
+        zoneId: null,
+        hasFertilizer: false,
+      });
 
       await expect(
         service.sendCommandToDevice('device-1', 'fertilizer_on', {}),
@@ -66,7 +70,11 @@ describe('SyncService — fertilizer guard', () => {
     });
 
     it('throws BadRequestException when hasFertilizer=false and command is fertilizer_off', async () => {
-      mockDeviceRepo.findOne.mockResolvedValue({ farmId: 'farm-1', zoneId: null, hasFertilizer: false });
+      mockDeviceRepo.findOne.mockResolvedValue({
+        farmId: 'farm-1',
+        zoneId: null,
+        hasFertilizer: false,
+      });
 
       await expect(
         service.sendCommandToDevice('device-1', 'fertilizer_off', {}),
@@ -74,25 +82,55 @@ describe('SyncService — fertilizer guard', () => {
     });
 
     it('proceeds when hasFertilizer=true and command is fertilizer_on', async () => {
-      mockDeviceRepo.findOne.mockResolvedValue({ farmId: 'farm-1', zoneId: null, hasFertilizer: true });
+      mockDeviceRepo.findOne.mockResolvedValue({
+        farmId: 'farm-1',
+        zoneId: null,
+        hasFertilizer: true,
+      });
       mockMqttService.publishToDevice.mockResolvedValue(undefined);
 
-      const result = await service.sendCommandToDevice('device-1', 'fertilizer_on', {});
+      const result = await service.sendCommandToDevice(
+        'device-1',
+        'fertilizer_on',
+        {},
+      );
 
-      expect(result).toEqual({ success: true, message: 'Command sent to device' });
-      expect(mockMqttService.publishToDevice).toHaveBeenCalledWith('device-1', 'fertilizer_on', {});
+      expect(result).toEqual({
+        success: true,
+        message: 'Command sent to device',
+      });
+      expect(mockMqttService.publishToDevice).toHaveBeenCalledWith(
+        'device-1',
+        'fertilizer_on',
+        {},
+      );
     });
 
     it('does not check hasFertilizer for non-fertilizer commands', async () => {
       // Only one findOne call (for getDeviceIds cache miss), not a second one for guard
-      mockDeviceRepo.findOne.mockResolvedValue({ farmId: 'farm-1', zoneId: null, hasFertilizer: false });
+      mockDeviceRepo.findOne.mockResolvedValue({
+        farmId: 'farm-1',
+        zoneId: null,
+        hasFertilizer: false,
+      });
       mockMqttService.publishToDevice.mockResolvedValue(undefined);
 
-      const result = await service.sendCommandToDevice('device-1', 'pump_on', {});
+      const result = await service.sendCommandToDevice(
+        'device-1',
+        'pump_on',
+        {},
+      );
 
-      expect(result).toEqual({ success: true, message: 'Command sent to device' });
+      expect(result).toEqual({
+        success: true,
+        message: 'Command sent to device',
+      });
       // findOne called at most once (for the ID cache), never for guard check on pump_on
-      expect(mockMqttService.publishToDevice).toHaveBeenCalledWith('device-1', 'pump_on', {});
+      expect(mockMqttService.publishToDevice).toHaveBeenCalledWith(
+        'device-1',
+        'pump_on',
+        {},
+      );
     });
   });
 });

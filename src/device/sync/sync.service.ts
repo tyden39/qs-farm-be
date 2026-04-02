@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -103,7 +108,9 @@ export class SyncService implements OnModuleInit {
     }
   }
 
-  private async getDeviceIds(deviceId: string): Promise<{ farmId: string | null; zoneId: string | null }> {
+  private async getDeviceIds(
+    deviceId: string,
+  ): Promise<{ farmId: string | null; zoneId: string | null }> {
     const cached = this.deviceContextCache.get(deviceId);
     if (cached && Date.now() - cached.loadedAt < this.FARM_CACHE_TTL) {
       return { farmId: cached.farmId, zoneId: cached.zoneId };
@@ -268,7 +275,8 @@ export class SyncService implements OnModuleInit {
 
     // Update device fertilizerEnabled state on FERTILIZER_ON/FERTILIZER_OFF feedback
     if (
-      (payload.command === 'FERTILIZER_ON' || payload.command === 'FERTILIZER_OFF') &&
+      (payload.command === 'FERTILIZER_ON' ||
+        payload.command === 'FERTILIZER_OFF') &&
       payload.success
     ) {
       const fertilizerEnabled = payload.command === 'FERTILIZER_ON';
@@ -292,10 +300,18 @@ export class SyncService implements OnModuleInit {
     // SET_IRRIGATION_MODE: { command, success, irrigationMode } → update irrigationMode
     if (payload.command === 'SET_IRRIGATION_MODE' && payload.success) {
       const irrigationMode = payload.irrigationMode as IrrigationMode;
-      if (irrigationMode && Object.values(IrrigationMode).includes(irrigationMode)) {
+      if (
+        irrigationMode &&
+        Object.values(IrrigationMode).includes(irrigationMode)
+      ) {
         await this.deviceRepo.update(deviceId, { irrigationMode });
-        this.eventEmitter.emit('device.mode.changed', { deviceId, irrigationMode });
-        this.logger.log(`Device ${deviceId} irrigationMode updated to ${irrigationMode}`);
+        this.eventEmitter.emit('device.mode.changed', {
+          deviceId,
+          irrigationMode,
+        });
+        this.logger.log(
+          `Device ${deviceId} irrigationMode updated to ${irrigationMode}`,
+        );
       }
     }
 
@@ -304,7 +320,9 @@ export class SyncService implements OnModuleInit {
       const controlMode = payload.mode as ControlMode;
       if (controlMode && Object.values(ControlMode).includes(controlMode)) {
         await this.deviceRepo.update(deviceId, { controlMode });
-        this.logger.log(`Device ${deviceId} controlMode updated to ${controlMode}`);
+        this.logger.log(
+          `Device ${deviceId} controlMode updated to ${controlMode}`,
+        );
       }
     }
 

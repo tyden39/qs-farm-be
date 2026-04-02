@@ -163,7 +163,11 @@ export class ZoneController {
     @Param('thresholdId') thresholdId: string,
     @Body() dto: UpdateZoneThresholdDto,
   ) {
-    return this.zoneSensorConfigService.updateThreshold(configId, thresholdId, dto);
+    return this.zoneSensorConfigService.updateThreshold(
+      configId,
+      thresholdId,
+      dto,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

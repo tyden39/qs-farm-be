@@ -40,7 +40,9 @@ export class ZoneSensorConfig {
   @Column({ type: 'varchar', nullable: true })
   unit: string;
 
-  @OneToMany(() => ZoneThreshold, (zt) => zt.zoneSensorConfig, { cascade: true })
+  @OneToMany(() => ZoneThreshold, (zt) => zt.zoneSensorConfig, {
+    cascade: true,
+  })
   thresholds: ZoneThreshold[];
 
   @CreateDateColumn()

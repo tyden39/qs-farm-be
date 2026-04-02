@@ -4,7 +4,9 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 
 import { CreateZoneDto } from './create-zone.dto';
 
-export class UpdateZoneDto extends PartialType(OmitType(CreateZoneDto, ['farmId'] as const)) {
+export class UpdateZoneDto extends PartialType(
+  OmitType(CreateZoneDto, ['farmId'] as const),
+) {
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()

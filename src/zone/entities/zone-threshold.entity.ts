@@ -22,7 +22,9 @@ export class ZoneThreshold {
   @Column('uuid')
   zoneSensorConfigId: string;
 
-  @ManyToOne(() => ZoneSensorConfig, (zsc) => zsc.thresholds, { onDelete: 'CASCADE' })
+  @ManyToOne(() => ZoneSensorConfig, (zsc) => zsc.thresholds, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'zoneSensorConfigId' })
   zoneSensorConfig: ZoneSensorConfig;
 

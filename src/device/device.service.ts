@@ -60,7 +60,9 @@ export class DeviceService {
 
     // Sync farmId when zoneId changes
     if (updateDeviceDto.zoneId) {
-      const zone = await this.zoneRepository.findOne({ where: { id: updateDeviceDto.zoneId } });
+      const zone = await this.zoneRepository.findOne({
+        where: { id: updateDeviceDto.zoneId },
+      });
       if (zone) device.farmId = zone.farmId;
     }
 

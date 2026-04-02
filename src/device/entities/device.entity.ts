@@ -77,7 +77,10 @@ export class Device {
   @Column('uuid', { nullable: true })
   zoneId: string;
 
-  @ManyToOne('Zone', (zone: any) => zone.devices, { nullable: true, onDelete: 'SET NULL' })
+  @ManyToOne('Zone', (zone: any) => zone.devices, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
   @JoinColumn({ name: 'zoneId' })
   zone: Zone;
 

@@ -294,7 +294,10 @@ export class ThresholdService {
     return true;
   }
 
-  private clearStatesForSensor(deviceId: string, thresholds: { action: string }[]) {
+  private clearStatesForSensor(
+    deviceId: string,
+    thresholds: { action: string }[],
+  ) {
     const deviceStateMap = this.deviceStates.get(deviceId);
     if (!deviceStateMap) return;
 

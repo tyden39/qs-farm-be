@@ -25,6 +25,16 @@ import { IrrigationMode } from 'src/shared/enums/irrigation-mode.enum';
 import { ControlMode } from 'src/shared/enums/control-mode.enum';
 import { ConfigResolutionService } from 'src/zone/config-resolution.service';
 
+const COMMAND_LABEL: Record<string, string> = {
+  PUMP_ON: 'Bật máy bơm',
+  PUMP_OFF: 'Tắt máy bơm',
+  FERTILIZER_ON: 'Bật phân bón',
+  FERTILIZER_OFF: 'Tắt phân bón',
+  SET_IRRIGATION_MODE: 'Đặt chế độ tưới',
+  SET_MODE: 'Đặt chế độ',
+  OTA_UPDATE: 'Cập nhật OTA',
+};
+
 @Injectable()
 export class ScheduleService {
   private readonly logger = new Logger(ScheduleService.name);
@@ -36,9 +46,7 @@ export class ScheduleService {
   ]);
 
   // Commands that change control mode
-  private static readonly CONTROL_MODE_COMMANDS = new Set([
-    'SET_MODE',
-  ]);
+  private static readonly CONTROL_MODE_COMMANDS = new Set(['SET_MODE']);
 
   // farmId → farm owner userId cache (5min TTL)
   private farmOwnerCache: Map<string, { userId: string; loadedAt: number }> =
@@ -106,7 +114,11 @@ export class ScheduleService {
   async update(id: string, dto: UpdateDeviceScheduleDto) {
     const existing = await this.findOne(id);
 
-    if (dto.deviceId !== undefined || dto.farmId !== undefined || dto.zoneId !== undefined) {
+    if (
+      dto.deviceId !== undefined ||
+      dto.farmId !== undefined ||
+      dto.zoneId !== undefined
+    ) {
       this.validateTarget(
         dto.deviceId ?? existing.deviceId,
         dto.farmId ?? existing.farmId,
@@ -318,7 +330,8 @@ export class ScheduleService {
     const farmId =
       schedule.farmId ||
       (schedule.zoneId
-        ? (await this.zoneRepo.findOne({ where: { id: schedule.zoneId } }))?.farmId
+        ? (await this.zoneRepo.findOne({ where: { id: schedule.zoneId } }))
+            ?.farmId
         : null) ||
       (schedule.deviceId
         ? (await this.deviceService.findOne(schedule.deviceId))?.farmId
@@ -332,8 +345,10 @@ export class ScheduleService {
       if (!isOnline) {
         this.fcmService
           .sendToFarmOwner(farmId, {
-            title: `Schedule: ${schedule.name}`,
-            body: `Command "${schedule.command}" executed`,
+            title: `Lịch: ${schedule.name}`,
+            body: `Đã thực thi lệnh "${
+              COMMAND_LABEL[schedule.command] ?? schedule.command
+            }"`,
             data: {
               type: 'SCHEDULE_EXECUTED',
               scheduleId: schedule.id,
@@ -354,7 +369,9 @@ export class ScheduleService {
   /**
    * When a schedule sends SET_MODE, update controlMode in DB immediately.
    */
-  private async applyControlModeChange(schedule: DeviceSchedule): Promise<void> {
+  private async applyControlModeChange(
+    schedule: DeviceSchedule,
+  ): Promise<void> {
     if (!ScheduleService.CONTROL_MODE_COMMANDS.has(schedule.command)) return;
 
     const modeValue = schedule.params?.mode;
@@ -364,13 +381,22 @@ export class ScheduleService {
 
     if (schedule.zoneId) {
       await this.zoneRepo.update(schedule.zoneId, { controlMode });
-      this.logger.log(`Applied controlMode="${controlMode}" to zone ${schedule.zoneId}`);
+      this.logger.log(
+        `Applied controlMode="${controlMode}" to zone ${schedule.zoneId}`,
+      );
     } else if (schedule.deviceId) {
       await this.deviceRepo.update(schedule.deviceId, { controlMode });
-      this.logger.log(`Applied controlMode="${controlMode}" to device ${schedule.deviceId}`);
+      this.logger.log(
+        `Applied controlMode="${controlMode}" to device ${schedule.deviceId}`,
+      );
     } else if (schedule.farmId) {
-      await this.deviceRepo.update({ farmId: schedule.farmId }, { controlMode });
-      this.logger.log(`Applied controlMode="${controlMode}" to all devices in farm ${schedule.farmId}`);
+      await this.deviceRepo.update(
+        { farmId: schedule.farmId },
+        { controlMode },
+      );
+      this.logger.log(
+        `Applied controlMode="${controlMode}" to all devices in farm ${schedule.farmId}`,
+      );
     }
   }
 
@@ -383,7 +409,8 @@ export class ScheduleService {
 
     // Support both param key conventions: { mode } or { irrigationMode }
     const modeValue = schedule.params?.mode ?? schedule.params?.irrigationMode;
-    if (!modeValue || !Object.values(IrrigationMode).includes(modeValue)) return;
+    if (!modeValue || !Object.values(IrrigationMode).includes(modeValue))
+      return;
 
     const irrigationMode = modeValue as IrrigationMode;
 
@@ -400,7 +427,10 @@ export class ScheduleService {
         `Applied irrigationMode="${irrigationMode}" to device ${schedule.deviceId}`,
       );
     } else if (schedule.farmId) {
-      await this.deviceRepo.update({ farmId: schedule.farmId }, { irrigationMode });
+      await this.deviceRepo.update(
+        { farmId: schedule.farmId },
+        { irrigationMode },
+      );
       const devices = await this.deviceService.findAll(schedule.farmId);
       for (const device of devices) {
         this.configResolution.invalidateCache(device.id);
