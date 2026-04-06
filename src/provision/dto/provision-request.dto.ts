@@ -8,6 +8,10 @@ export class ProvisionRequestDto {
   @IsString()
   hw?: string;
 
+  @IsOptional()
+  @IsString()
+  fw?: string;
+
   @IsString()
   nonce: string; // Required for response topic
 

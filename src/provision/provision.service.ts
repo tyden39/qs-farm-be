@@ -31,10 +31,10 @@ export class ProvisionService {
    */
   async handleProvisionRequest(payload: ProvisionRequestDto) {
     try {
-      const { serial, hw, nonce } = payload;
+      const { serial, hw, fw, nonce } = payload;
 
       this.logger.log(
-        `Provisioning request from serial: ${serial}, hw: ${hw}, nonce: ${nonce}`,
+        `Provisioning request from serial: ${serial}, hw: ${hw}, fw: ${fw}, nonce: ${nonce}`,
       );
 
       // Validate serial format
@@ -71,6 +71,7 @@ export class ProvisionService {
         device = this.deviceRepository.create({
           serial,
           hardwareVersion: hw || null,
+          firmwareVersion: fw || null,
           status: DeviceStatus.PENDING,
           name: `Device-${serial.slice(-8)}`,
           imei: serial, // Use serial as imei for now
@@ -79,6 +80,7 @@ export class ProvisionService {
         });
       } else {
         device.hardwareVersion = hw || device.hardwareVersion;
+        device.firmwareVersion = fw || device.firmwareVersion;
         device.status = DeviceStatus.PENDING;
         device.provisionedAt = new Date();
       }
