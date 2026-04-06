@@ -24,7 +24,7 @@ export class PumpSession {
   @Column('uuid')
   deviceId: string;
 
-  @ManyToOne(() => Device)
+  @ManyToOne(() => Device, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'deviceId' })
   device: Device;
 
