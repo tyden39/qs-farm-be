@@ -209,6 +209,7 @@ export class FirmwareService {
       const log = await this.updateLogRepository.save(
         this.updateLogRepository.create({
           firmwareId: firmware.id,
+          firmwareVersion: firmware.version,
           deviceId: device.id,
           previousVersion: device.firmwareVersion,
           status: FirmwareUpdateStatus.PENDING,
@@ -293,7 +294,8 @@ export class FirmwareService {
         where: { version: data.version },
       });
       const newLog = this.updateLogRepository.create({
-        firmwareId: firmware?.id,
+        firmwareId: firmware?.id ?? null,
+        firmwareVersion: data.version,
         deviceId: data.deviceId,
         previousVersion: data.previousVersion,
         status: data.success
@@ -412,12 +414,13 @@ export class FirmwareService {
 
   async remove(id: string) {
     const firmware = await this.findOne(id);
+    const filePath = firmware.filePath;
 
-    // Delete file from disk
+    await this.firmwareRepository.remove(firmware);
+
+    // Delete file after successful DB removal to avoid orphaned records
     try {
-      unlinkSync(firmware.filePath);
+      unlinkSync(filePath);
     } catch {}
-
-    return this.firmwareRepository.remove(firmware);
   }
 }

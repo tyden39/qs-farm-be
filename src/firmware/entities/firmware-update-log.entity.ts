@@ -7,7 +7,6 @@ import {
   CreateDateColumn,
   Index,
 } from 'typeorm';
-import { Firmware } from './firmware.entity';
 import { Device } from 'src/device/entities/device.entity';
 
 export enum FirmwareUpdateStatus {
@@ -24,12 +23,13 @@ export class FirmwareUpdateLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('uuid')
-  firmwareId: string;
+  // Plain UUID reference — no FK constraint so logs survive firmware deletion
+  @Column({ type: 'uuid', nullable: true })
+  firmwareId: string | null;
 
-  @ManyToOne(() => Firmware)
-  @JoinColumn({ name: 'firmwareId' })
-  firmware: Firmware;
+  // Snapshot of firmware version at time of update — preserved even if firmware is deleted
+  @Column({ length: 20, nullable: true })
+  firmwareVersion: string | null;
 
   @Column('uuid')
   deviceId: string;
