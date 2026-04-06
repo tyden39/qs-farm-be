@@ -166,4 +166,11 @@ export class DeviceController {
   async unpairDevice(@Param('id') id: string) {
     return this.provisionService.unpairDevice(id);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post(':id/reset')
+  async resetDevice(@Param('id') id: string) {
+    return this.deviceService.resetDevice(id);
+  }
 }

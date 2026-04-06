@@ -1,10 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectConnection, InjectRepository } from '@nestjs/typeorm';
 
-import { Repository } from 'typeorm';
+import { Connection, Repository } from 'typeorm';
 
-import { Device } from './entities/device.entity';
+import { Device, DeviceStatus } from './entities/device.entity';
+import { PairingToken } from './entities/pairing-token.entity';
 import { Zone } from 'src/zone/entities/zone.entity';
+import { SensorData } from 'src/sensor/entities/sensor-data.entity';
+import { AlertLog } from 'src/sensor/entities/alert-log.entity';
+import { CommandLog } from 'src/sensor/entities/command-log.entity';
+import { SensorConfig } from 'src/sensor/entities/sensor-config.entity';
+import { DeviceSchedule } from 'src/schedule/entities/device-schedule.entity';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 
@@ -15,6 +21,20 @@ export class DeviceService {
     private readonly deviceRepository: Repository<Device>,
     @InjectRepository(Zone)
     private readonly zoneRepository: Repository<Zone>,
+    @InjectRepository(SensorData)
+    private readonly sensorDataRepository: Repository<SensorData>,
+    @InjectRepository(AlertLog)
+    private readonly alertLogRepository: Repository<AlertLog>,
+    @InjectRepository(CommandLog)
+    private readonly commandLogRepository: Repository<CommandLog>,
+    @InjectRepository(SensorConfig)
+    private readonly sensorConfigRepository: Repository<SensorConfig>,
+    @InjectRepository(DeviceSchedule)
+    private readonly deviceScheduleRepository: Repository<DeviceSchedule>,
+    @InjectRepository(PairingToken)
+    private readonly pairingTokenRepository: Repository<PairingToken>,
+    @InjectConnection()
+    private readonly connection: Connection,
   ) {}
 
   async findAll(farmId?: string) {
@@ -71,7 +91,38 @@ export class DeviceService {
 
   async remove(id: string) {
     const device = await this.findOne(id);
-
+    await this.cleanDeviceData(device.id, device.serial);
     return this.deviceRepository.remove(device);
+  }
+
+  async resetDevice(id: string) {
+    const device = await this.findOne(id);
+    await this.cleanDeviceData(device.id, device.serial);
+    await this.deviceRepository.update(id, {
+      farmId: null,
+      deviceToken: null,
+      status: DeviceStatus.PENDING,
+      pairedAt: null,
+    });
+    return this.deviceRepository.findOne({ where: { id } });
+  }
+
+  // Transactionally delete all data associated with a device.
+  // Used by both remove() and resetDevice() so re-pairing behaves like a fresh setup.
+  private async cleanDeviceData(
+    deviceId: string,
+    serial: string | null,
+  ): Promise<void> {
+    await this.connection.transaction(async (manager) => {
+      await manager.delete(AlertLog, { deviceId });
+      await manager.delete(CommandLog, { deviceId });
+      await manager.delete(SensorData, { deviceId });
+      await manager.delete(DeviceSchedule, { deviceId });
+      // SensorThreshold is deleted automatically via DB-level onDelete: CASCADE on FK
+      await manager.delete(SensorConfig, { deviceId });
+      if (serial) {
+        await manager.delete(PairingToken, { serial });
+      }
+    });
   }
 }
