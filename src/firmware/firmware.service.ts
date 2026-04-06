@@ -229,7 +229,7 @@ export class FirmwareService {
           fileSize: firmware.fileSize,
         });
         results.push({ deviceId: device.id, logId: log.id, status: 'sent' });
-      } catch (error) {
+      } catch (error: any) {
         log.status = FirmwareUpdateStatus.FAILED;
         log.errorMessage = error.message;
         await this.updateLogRepository.save(log);
@@ -377,7 +377,7 @@ export class FirmwareService {
       this.deviceGateway.server
         .to(data.socketId)
         .emit('firmwareUpdateAck', result);
-    } catch (error) {
+    } catch (error: any) {
       this.deviceGateway.server
         .to(data.socketId)
         .emit('firmwareUpdateError', { message: error.message });
