@@ -122,6 +122,16 @@ export class DeviceController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        command: { type: 'string' },
+        params: { type: 'any' }
+      },
+      required: ['command'],
+    },
+  })
   @Post(':id/command')
   async sendCommand(
     @Param('id') id: string,
