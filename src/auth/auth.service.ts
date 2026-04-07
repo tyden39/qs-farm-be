@@ -56,7 +56,6 @@ export class AuthService {
 
     return {
       ...tokens,
-      token: tokens.accessToken,
       user: {
         id: user.id,
         username: user.username,
@@ -72,7 +71,6 @@ export class AuthService {
 
     return {
       ...tokens,
-      token: tokens.accessToken,
       user: {
         id: user.id,
         username: user.username,
