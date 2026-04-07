@@ -96,6 +96,7 @@ export class SyncService implements OnModuleInit {
       const result = await this.provisionService.handleProvisionRequest({
         serial: payload.serial,
         hw: payload.hw,
+        fw: payload.fw,
         nonce: payload.nonce,
         sig: payload.sig,
       });

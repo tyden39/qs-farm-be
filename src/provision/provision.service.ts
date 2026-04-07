@@ -419,7 +419,7 @@ export class ProvisionService {
       this.logger.debug(
         `Published provision response to provision/resp/${nonce} for device ${deviceId}`,
       );
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(
         `Failed to publish provision response: ${error.message}`,
       );
@@ -442,7 +442,7 @@ export class ProvisionService {
       });
 
       this.logger.debug(`Published set_owner command for device ${deviceId}`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`Failed to publish set_owner command: ${error.message}`);
     }
   }
