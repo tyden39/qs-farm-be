@@ -2,6 +2,45 @@
 
 All notable changes to the IoT Farm Management Platform are documented in this file.
 
+## Version 1.5.2 (2026-04-07)
+
+### Added: Gateway-Device Enforcement
+
+**Feature:** LoRa gateway control flow with device assignment and ACL enforcement
+
+- **Device Gateway Assignment:** Devices assigned to gateway via `gatewayId` foreign key (nullable)
+- **Direct Connect Block:** Devices with `gatewayId` rejected on MQTT auth if attempting direct connection
+- **Gateway ACL Enforcement:**
+  - Gateway can only publish/subscribe to assigned devices (topic: `device/{deviceId}/*`)
+  - Gateway publishes to `gateway/{gwId}/status`, `gateway/{gwId}/devices/report` (self-management)
+  - Gateway subscribes to `device/+/cmd` (wildcard for all assigned devices)
+  - ACL evaluation enforces device ownership via async cache
+- **Device Ownership Cache:**
+  - In-memory cache maps gateway → device IDs (60s TTL)
+  - Async validation on each ACL check (minimal latency impact)
+  - Event-driven invalidation on device assignment changes via `gateway.devices.changed`
+- **Auto-Discovery:**
+  - Gateway publishes device serials to `gateway/{gwId}/devices/report`
+  - Backend listener auto-assigns device(s) to gateway
+  - Simplifies LoRa provisioning workflow
+- **REST API Endpoints:**
+  - `POST /api/gateways/:id/devices` - Assign device(s) to gateway
+  - `DELETE /api/gateways/:id/devices` - Unassign device(s) from gateway
+  - `GET /api/gateways/:id/devices` - List devices assigned to gateway
+- **Files Modified:**
+  - `src/device/entities/device.entity.ts` - added gatewayId FK, @ManyToOne Gateway
+  - `src/gateway/entities/gateway.entity.ts` - added @OneToMany devices
+  - `src/gateway/dto/assign-devices.dto.ts` - new DTO for device IDs
+  - `src/gateway/gateway.module.ts` - added DeviceRepository
+  - `src/gateway/gateway.service.ts` - assignDevices, unassignDevices, findDevicesByGateway, auto-discovery handler
+  - `src/gateway/gateway.controller.ts` - 3 new endpoints
+  - `src/emqx/emqx.service.ts` - async device ownership cache, gateway ACL enforcement
+  - `src/device/mqtt/mqtt.service.ts` - subscribe to gateway device report topic
+- **Backward Compatibility:** Zero-downtime; existing devices unaffected (gatewayId = null allows direct connect)
+- **Status:** Build verified, code reviewed
+
+---
+
 ## Version 1.5.1 (2026-03-25)
 
 ### Added: Fertilizer Machine Support
@@ -356,5 +395,5 @@ All notable changes to the IoT Farm Management Platform are documented in this f
 ---
 
 **Changelog Maintained By:** Documentation Management System
-**Last Updated:** 2026-03-20
+**Last Updated:** 2026-04-07
 **Format:** Semantic Versioning (MAJOR.MINOR.PATCH)

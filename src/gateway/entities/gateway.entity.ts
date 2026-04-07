@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -64,6 +65,9 @@ export class Gateway {
 
   @Column({ nullable: true })
   pairedAt: Date;
+
+  @OneToMany('Device', (device: any) => device.gateway)
+  devices: any[];
 
   @CreateDateColumn()
   createdAt: Date;

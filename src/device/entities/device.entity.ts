@@ -68,6 +68,10 @@ export class Device {
   @Column('uuid', { nullable: true })
   gatewayId: string;
 
+  @ManyToOne('Gateway', (gw: any) => gw.devices, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'gatewayId' })
+  gateway: any;
+
   @Column({ type: 'float', nullable: true })
   operatingLifeHours: number;
 

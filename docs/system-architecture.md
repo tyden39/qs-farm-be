@@ -232,9 +232,9 @@
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │ Gateway Module (LoRa Gateway Management)                   │  │
-│  │  ├── imports: JwtModule, ProvisionModule                  │  │
+│  │  ├── imports: JwtModule, ProvisionModule, DeviceModule    │  │
 │  │  │                                                         │  │
-│  │  ├── GatewayService (CRUD, pairing, status)               │  │
+│  │  ├── GatewayService (CRUD, pairing, status, device assignment)
 │  │  │   ├── handleProvisionRequest (provision/gateway/new)   │  │
 │  │  │   │   • Validate gateway serial + nonce                │  │
 │  │  │   │   • Create Gateway (PENDING status)                │  │
@@ -245,6 +245,17 @@
 │  │  │   │   • Set Gateway to PAIRED, assign farmId           │  │
 │  │  │   │   • Generate mqttToken                             │  │
 │  │  │   │   • Publish {gatewayId, mqttToken} to gateway      │  │
+│  │  │   ├── assignDevices (POST /api/gateways/:id/devices)   │  │
+│  │  │   │   • Assign device(s) to gateway (set gatewayId)    │  │
+│  │  │   │   • Emit gateway.devices.changed event             │  │
+│  │  │   ├── unassignDevices (DELETE /api/gateways/:id/devices)
+│  │  │   │   • Remove device(s) from gateway                  │  │
+│  │  │   │   • Emit gateway.devices.changed event             │  │
+│  │  │   ├── findDevicesByGateway (GET /api/gateways/:id/devices)
+│  │  │   │   • List all devices assigned to gateway           │  │
+│  │  │   ├── auto-discovery (gateway/+/devices/report MQTT)  │  │
+│  │  │   │   • Listen to gateway/{gwId}/devices/report topic  │  │
+│  │  │   │   • Auto-assign device serials to gateway          │  │
 │  │  │   ├── isGatewayOnline (lastSeenAt < 90s)              │  │
 │  │  │   └── updateLastSeen (from heartbeat on gateway topic) │  │
 │  │  │                                                         │  │
@@ -252,28 +263,36 @@
 │  │  │   ├── POST /api/provision/gateway/pair                 │  │
 │  │  │   ├── GET /api/gateways                                │  │
 │  │  │   ├── GET /api/gateways/:id                            │  │
+│  │  │   ├── POST /api/gateways/:id/devices (assign)          │  │
+│  │  │   ├── DELETE /api/gateways/:id/devices (unassign)      │  │
+│  │  │   ├── GET /api/gateways/:id/devices (list)             │  │
 │  │  │   └── GET /api/gateways/:id/status                     │  │
 │  │  │                                                         │  │
-│  │  ├── Gateway entity (serial, firmware, status, farmId)    │  │
-│  │  └── GatewayPairingToken entity (same structure as Device)│  │
+│  │  ├── Gateway entity (serial, firmware, status, farmId, 1:M devices)
+│  │  └── Device enhancements: gatewayId (nullable FK)         │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │ EMQX Module (MQTT Broker Integration)                      │  │
-│  │  ├── imports: JwtModule                                   │  │
+│  │  ├── imports: JwtModule, GatewayModule, DeviceModule       │  │
 │  │  │                                                         │  │
 │  │  ├── EmqxService                                           │  │
 │  │  │   ├── POST /api/emqx/auth (webhook from broker)        │  │
-│  │  │   │   • Validate device token OR gateway token OR JWT  │  │
+│  │  │   │   • Device auth: check token, block if gatewayId set
+│  │  │   │   • Gateway auth: username = gateway:{gwId}        │  │
+│  │  │   │   • User auth: JWT verification, token version     │  │
 │  │  │   │   • Check device/gateway status (disabled = deny)  │  │
-│  │  │   │   • Gateway: username = gateway:{gwId}             │  │
 │  │  │   │   • Return {allow: true/false}                     │  │
 │  │  │   ├── POST /api/emqx/acl (webhook from broker)         │  │
-│  │  │   │   • Device: device/{id}/* only                     │  │
-│  │  │   │   • Gateway: device/+/*, provision/resp/+,         │  │
-│  │  │   │     gateway/{gwId}/ota, gateway/{gwId}/device-ota  │  │
+│  │  │   │   • Device: device/{id}/* only (no multi-device)   │  │
+│  │  │   │   • Gateway (with device ownership enforcement):    │  │
+│  │  │   │     - Publish: device/+/*, gateway/{gwId}/*, etc   │  │
+│  │  │   │     - Subscribe: device/+/cmd (all assigned devices)
+│  │  │   │     - device/{id}/* only if id in gateway's devices │  │
+│  │  │   │   • Async cache: device assignment list (60s TTL)  │  │
+│  │  │   │   • Cache invalidation on gateway.devices.changed   │  │
+│  │  │   │   • User: farm-scoped device access                │  │
 │  │  │   │   • Return {allow: true/false}                     │  │
-│  │  │   └── Topic isolation & farm scoping                   │  │
 │  │  │                                                         │  │
 │  │  └── EMQX endpoints (auth, ACL validation)                │  │
 │  └────────────────────────────────────────────────────────────┘  │
@@ -382,6 +401,7 @@
 │ serial: str (unique)             │
 │ status: enum                     │
 │ farmId: UUID (FK)                │
+│ gatewayId: UUID (FK, nullable)   │
 │ zoneId: UUID (FK, nullable)      │
 │ latitude, longitude: float       │
 │ irrigationMode: enum (nullable)  │

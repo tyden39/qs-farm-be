@@ -105,12 +105,23 @@ The IoT Farm Management Platform follows a phased development approach, progress
 - ✅ API coverage: 50+ endpoints
 - ✅ Entity relationships: Full referential integrity
 
-## Phase 3: Production Hardening (In Progress - 15%)
+## Phase 3: Production Hardening (In Progress - 20%)
 
 ### Status: IN PROGRESS
 **Timeline:** March 2026 - April 2026 (estimated)
 **Priority:** High
-**Completion:** Milestone 1 started 2026-03-16 with pump and firmware modules
+**Completion:** Milestone 1 started 2026-03-16 with pump and firmware modules; Milestone 2 (2026-04-07) added gateway-device enforcement
+
+### Completed Sub-features
+
+#### 3.0 Gateway-Device Enforcement (v1.5.2)
+- ✅ Device → Gateway assignment with `gatewayId` foreign key
+- ✅ Device direct MQTT connect blocked when assigned to gateway
+- ✅ Gateway ACL enforcement: gateways can only publish/subscribe to assigned devices
+- ✅ Async device ownership cache (60s TTL) in EMQX ACL
+- ✅ Auto-discovery: gateway publishes device serials → server auto-assigns
+- ✅ 3 new REST endpoints: assign/unassign/find devices per gateway
+- ✅ Event-driven cache invalidation on device assignment changes
 
 ### Planned Features
 
@@ -351,10 +362,12 @@ Phase 1: Core Infrastructure
        ├─ FCM Push Notifications ✅ (early delivery)
        ├─ Farm-Level WebSocket ✅ (early delivery)
        ├─ Coffee Price Intelligence ✅ (early delivery)
-       └─ Pump Session Tracking ✅ (early delivery)
+       ├─ Pump Session Tracking ✅ (early delivery)
+       └─ Zone Hierarchy & Config Inheritance ✅ (early delivery)
           │
           └─→ Phase 3: Production Hardening
               │
+              ├─ Gateway-Device Enforcement ✅ (2026-04-07)
               ├─ Database Migrations
               ├─ Monitoring & Observability
               ├─ Rate Limiting
@@ -446,10 +459,10 @@ Phase 1: Core Infrastructure
 
 ---
 
-**Document Version:** 1.5
-**Last Updated:** 2026-03-18
+**Document Version:** 1.6
+**Last Updated:** 2026-04-07
 **Phase 1-2 Status:** Complete (100%)
-**Phase 3 Status:** In Progress (15% - Database indices, monitoring foundations)
+**Phase 3 Status:** In Progress (20% - Gateway enforcement, monitoring foundations)
 **Phase 4 Status:** In Progress (40% - Advanced features delivered ahead of schedule)
 **Phase 5 Status:** Planned
 **Release Timeline:**
@@ -459,3 +472,6 @@ Phase 1: Core Infrastructure
 - v1.3 (2026-03-12): Coffee price market intelligence
 - v1.4 (2026-03-16): Pump session tracking & Firmware OTA
 - v1.4.1 (2026-03-17): Coffee price schedule optimized (noon daily)
+- v1.5 (2026-03-20): Zone hierarchy & config inheritance
+- v1.5.1 (2026-03-25): Fertilizer machine support
+- v1.5.2 (2026-04-07): Gateway-device enforcement

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Device, DeviceStatus } from 'src/device/entities/device.entity';
 import { Farm } from 'src/farm/entities/farm.entity';
 import { Gateway, GatewayStatus } from 'src/gateway/entities/gateway.entity';
@@ -12,6 +13,10 @@ import { EmqxAclDto } from './dto/emqx-acl.dto';
 @Injectable()
 export class EmqxService {
   private readonly logger = new Logger(EmqxService.name);
+
+  // In-memory cache: gwId → { deviceIds, expiresAt }
+  private gatewayDeviceCache = new Map<string, { deviceIds: Set<string>; expiresAt: number }>();
+  private readonly CACHE_TTL = 60_000; // 60s
 
   constructor(
     @InjectRepository(Device)
@@ -48,6 +53,11 @@ export class EmqxService {
         // Simple token comparison for static tokens
         const tokenMatches = device.deviceToken === password;
         if (tokenMatches && device.status !== DeviceStatus.DISABLED) {
+          // Block direct connect if device is assigned to a gateway
+          if (device.gatewayId) {
+            this.logger.warn(`Device ${username} blocked: must connect through gateway ${device.gatewayId}`);
+            return false;
+          }
           this.logger.log(`Device authenticated: ${username}`);
           return true;
         }
@@ -109,7 +119,7 @@ export class EmqxService {
 
       // Gateway access control
       if (username.startsWith('gateway:')) {
-        return this.checkGatewayAcl(username, topic, access);
+        return await this.checkGatewayAcl(username, topic, access);
       }
 
       // Device access control
@@ -125,31 +135,78 @@ export class EmqxService {
     }
   }
 
-  private checkGatewayAcl(username: string, topic: string, access: number): boolean {
+  private async checkGatewayAcl(username: string, topic: string, access: number): Promise<boolean> {
     const gwId = username.replace('gateway:', '');
 
     // PUBLISH
     if (access === 2) {
-      return (
-        topic.startsWith('device/') ||
-        topic === 'provision/new' ||
-        topic === 'provision/gateway/new' ||
-        topic === `gateway/${gwId}/status`
-      );
+      if (topic === `gateway/${gwId}/status`) return true;
+      if (topic === 'provision/gateway/new') return true;
+      if (topic === `gateway/${gwId}/devices/report`) return true;
+      if (topic === 'provision/new') return true;
+
+      // Device topics — gateway must own the device
+      if (topic.startsWith('device/')) {
+        const deviceId = topic.split('/')[1];
+        const deviceIds = await this.getGatewayDeviceIds(gwId);
+        if (!deviceIds.has(deviceId)) {
+          this.logger.warn(`Gateway ${gwId} denied publish to ${topic}: device not assigned`);
+          return false;
+        }
+        return true;
+      }
+
+      return false;
     }
 
     // SUBSCRIBE
     if (access === 1) {
-      return (
-        topic.startsWith('device/') ||
-        topic.startsWith('provision/resp/') ||
-        topic.startsWith('provision/gateway/resp/') ||
-        topic === `gateway/${gwId}/ota` ||
-        topic === `gateway/${gwId}/device-ota`
-      );
+      if (topic === `gateway/${gwId}/ota`) return true;
+      if (topic === `gateway/${gwId}/device-ota`) return true;
+      if (topic.startsWith('provision/resp/')) return true;
+      if (topic.startsWith('provision/gateway/resp/')) return true;
+
+      // Device topics — allow wildcard only for command topic, validate ownership otherwise
+      if (topic.startsWith('device/')) {
+        const parts = topic.split('/');
+        const deviceId = parts[1];
+        // Gateway subscribes device/+/cmd to receive commands for all its devices
+        if (deviceId === '+' && parts[2] === 'cmd') return true;
+        if (deviceId === '+') return false;
+        const deviceIds = await this.getGatewayDeviceIds(gwId);
+        return deviceIds.has(deviceId);
+      }
+
+      return false;
     }
 
     return false;
+  }
+
+  private async getGatewayDeviceIds(gatewayId: string): Promise<Set<string>> {
+    const cached = this.gatewayDeviceCache.get(gatewayId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.deviceIds;
+    }
+
+    const devices = await this.deviceRepository.find({
+      where: { gatewayId },
+      select: ['id'],
+    });
+
+    const deviceIds = new Set(devices.map((d) => d.id));
+    this.gatewayDeviceCache.set(gatewayId, {
+      deviceIds,
+      expiresAt: Date.now() + this.CACHE_TTL,
+    });
+
+    return deviceIds;
+  }
+
+  @OnEvent('gateway.devices.changed')
+  handleGatewayDevicesChanged(data: { gatewayId: string }) {
+    this.gatewayDeviceCache.delete(data.gatewayId);
+    this.logger.debug(`ACL cache invalidated for gateway ${data.gatewayId}`);
   }
 
   /**
