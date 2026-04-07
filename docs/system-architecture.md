@@ -115,34 +115,10 @@
 │  │  ├── imports: DeviceModule, FilesModule                  │  │
 │  │  ├── exports: ZoneService, ConfigResolutionService      │  │
 │  │  │                                                         │  │
-│  │  ├── ZoneService (CRUD for zones)                         │  │
-│  │  │   ├── findAllByFarm(farmId)                             │  │
-│  │  │   ├── create/update/remove operations                  │  │
-│  │  │   └── togglePump(zoneId, action) - broadcast to all   │  │
-│  │  │       devices in zone                                  │  │
-│  │  │                                                         │  │
-│  │  ├── ZoneSensorConfigService (zone template configs)      │  │
-│  │  │   ├── CRUD for ZoneSensorConfig entities               │  │
-│  │  │   └── CRUD for ZoneThreshold entities                  │  │
-│  │  │                                                         │  │
-│  │  ├── ConfigResolutionService (runtime inheritance)        │  │
-│  │  │   ├── getDeviceContext() - load device + zone + zone  │  │
-│  │  │     configs with 60s cache                             │  │
-│  │  │   ├── resolveConfig() - pick active irrigationMode +  │  │
-│  │  │     controlMode using checkAll logic                  │  │
-│  │  │   ├── resolveThresholdsForSensor() - fallback chain:   │  │
-│  │  │     device(mode) → device(null) → zone(mode) →        │  │
-│  │  │     zone(null)                                          │  │
-│  │  │   └── invalidateCache(deviceId/zoneId)                │  │
-│  │  │                                                         │  │
-│  │  ├── Zone entity (1:M with Device, 1:M with Farm)        │  │
-│  │  ├── ZoneSensorConfig entity (zone sensor templates)      │  │
-│  │  ├── ZoneThreshold entity (zone thresholds per sensor)    │  │
-│  │  └── Zone endpoints:                                       │  │
-│  │      GET/POST/PATCH/DELETE /api/zone                      │  │
-│  │      GET/POST/PATCH/DELETE /api/zone/:id/sensor-config   │  │
-│  │      GET/POST/PATCH/DELETE /api/zone/:id/threshold       │  │
-│  │      POST /api/zone/:id/pump                              │  │
+│  │  ├── ZoneService: CRUD + togglePump, 60s cache            │  │
+│  │  ├── ZoneSensorConfigService: template configs + thresholds│  │
+│  │  ├── ConfigResolutionService: threshold fallback chain    │  │
+│  │  └── Zone endpoints: /api/zone (CRUD), sensor-config, etc │  │
 │  │                                                         │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                   │
@@ -255,17 +231,47 @@
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
+│  │ Gateway Module (LoRa Gateway Management)                   │  │
+│  │  ├── imports: JwtModule, ProvisionModule                  │  │
+│  │  │                                                         │  │
+│  │  ├── GatewayService (CRUD, pairing, status)               │  │
+│  │  │   ├── handleProvisionRequest (provision/gateway/new)   │  │
+│  │  │   │   • Validate gateway serial + nonce                │  │
+│  │  │   │   • Create Gateway (PENDING status)                │  │
+│  │  │   │   • Generate PairingToken (24h expiry)             │  │
+│  │  │   │   • Respond on provision/resp/{nonce}              │  │
+│  │  │   ├── pairGateway (POST /api/provision/gateway/pair)   │  │
+│  │  │   │   • Validate pairing token                         │  │
+│  │  │   │   • Set Gateway to PAIRED, assign farmId           │  │
+│  │  │   │   • Generate mqttToken                             │  │
+│  │  │   │   • Publish {gatewayId, mqttToken} to gateway      │  │
+│  │  │   ├── isGatewayOnline (lastSeenAt < 90s)              │  │
+│  │  │   └── updateLastSeen (from heartbeat on gateway topic) │  │
+│  │  │                                                         │  │
+│  │  ├── GatewayController                                     │  │
+│  │  │   ├── POST /api/provision/gateway/pair                 │  │
+│  │  │   ├── GET /api/gateways                                │  │
+│  │  │   ├── GET /api/gateways/:id                            │  │
+│  │  │   └── GET /api/gateways/:id/status                     │  │
+│  │  │                                                         │  │
+│  │  ├── Gateway entity (serial, firmware, status, farmId)    │  │
+│  │  └── GatewayPairingToken entity (same structure as Device)│  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                                                   │
+│  ┌────────────────────────────────────────────────────────────┐  │
 │  │ EMQX Module (MQTT Broker Integration)                      │  │
 │  │  ├── imports: JwtModule                                   │  │
 │  │  │                                                         │  │
 │  │  ├── EmqxService                                           │  │
 │  │  │   ├── POST /api/emqx/auth (webhook from broker)        │  │
-│  │  │   │   • Validate device token OR user JWT              │  │
-│  │  │   │   • Check device status (disabled = deny)          │  │
+│  │  │   │   • Validate device token OR gateway token OR JWT  │  │
+│  │  │   │   • Check device/gateway status (disabled = deny)  │  │
+│  │  │   │   • Gateway: username = gateway:{gwId}             │  │
 │  │  │   │   • Return {allow: true/false}                     │  │
 │  │  │   ├── POST /api/emqx/acl (webhook from broker)         │  │
-│  │  │   │   • Device: own topics only (device/{id}/*)        │  │
-│  │  │   │   • User: farm-scoped topics                       │  │
+│  │  │   │   • Device: device/{id}/* only                     │  │
+│  │  │   │   • Gateway: device/+/*, provision/resp/+,         │  │
+│  │  │   │     gateway/{gwId}/ota, gateway/{gwId}/device-ota  │  │
 │  │  │   │   • Return {allow: true/false}                     │  │
 │  │  │   └── Topic isolation & farm scoping                   │  │
 │  │  │                                                         │  │
@@ -274,76 +280,23 @@
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │ Notification Module (FCM Push)                             │  │
-│  │  ├── imports: TypeOrmModule (DeviceToken)                 │  │
-│  │  ├── exports: FcmService                                  │  │
-│  │  │                                                         │  │
-│  │  ├── FcmService (OnModuleInit)                             │  │
-│  │  │   ├── Initializes Firebase Admin SDK on startup        │  │
-│  │  │   ├── Graceful degradation if env var not set          │  │
-│  │  │   ├── sendToFarmOwner(farmId, notification)            │  │
-│  │  │   │   • Queries DeviceToken via Farm → User join       │  │
-│  │  │   │   • Sends via sendEachForMulticast                 │  │
-│  │  │   │   • Auto-removes stale/invalid tokens on failure   │  │
-│  │  │   └── Fire-and-forget (never throws to caller)        │  │
-│  │  │                                                         │  │
-│  │  ├── NotificationController                                │  │
-│  │  │   ├── POST /api/notification/register-token (upsert)   │  │
-│  │  │   └── DELETE /api/notification/unregister-token        │  │
-│  │  │                                                         │  │
-│  │  └── DeviceToken entity (userId FK, token unique, platform)│  │
+│  │  ├── FcmService: Firebase Admin SDK, sendToFarmOwner()     │  │
+│  │  ├── Controller: POST/DELETE /api/notification/-token      │  │
+│  │  └── DeviceToken entity (userId FK, token unique)          │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │ Pump Module (Session Tracking & Maintenance)               │  │
-│  │  ├── imports: DeviceModule                                │  │
-│  │  │                                                         │  │
-│  │  ├── PumpService                                           │  │
-│  │  │   ├── startSession(deviceId, sensorData)              │  │
-│  │  │   ├── stopSession(deviceId, status, reason)           │  │
-│  │  │   ├── @OnEvent('pump.started', 'pump.stopped', etc)  │  │
-│  │  │   │   └── Events emitted by SyncService from telemetry│  │
-│  │  │   │       (parses PUMP_STATUS field from payload)      │  │
-│  │  │   ├── @Interval(60_000) closeStaleSession             │  │
-│  │  │   │   └── Closes sessions with no data > 30s          │  │
-│  │  │   ├── getReport(deviceId) - summary + timeline        │  │
-│  │  │   ├── exportToExcel(deviceId) - via exceljs          │  │
-│  │  │   ├── Tracks cycles: running hours, cycles count      │  │
-│  │  │   └── Maintenance alerts based on thresholds          │  │
-│  │  │                                                         │  │
-│  │  ├── PumpController                                        │  │
-│  │  │   ├── GET /api/pump/report/:deviceId (JSON)          │  │
-│  │  │   └── GET /api/pump/report/:deviceId?format=excel    │  │
-│  │  │                                                         │  │
-│  │  ├── PumpSession entity (tracking pump cycles)           │  │
-│  │  ├── PumpSessionStatus enum (active/completed/interruped)│  │
-│  │  ├── InterruptedReason enum (lwt/esp_reboot/timeout)    │  │
-│  │  └── Event-driven: pump.started, pump.stopped,          │  │
-│  │      pump.disconnected                                    │  │
-│  │                                                         │  │
+│  │  ├── PumpService: startSession, stopSession, getReport,    │  │
+│  │  │   exportToExcel, event-driven (pump.started/stopped)    │  │
+│  │  └── PumpController: GET /api/pump/report (JSON/Excel)     │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │ Coffee Price Module (Market Intelligence)                  │  │
-│  │  ├── imports: none                                         │  │
-│  │  │                                                         │  │
-│  │  ├── CoffeePriceService                                   │  │
-│  │  │   ├── @Cron('0 12 * * *', timezone: 'Asia/Ho_Chi_Minh')│  │
-│  │  │   ├── Daily web scrape of giacaphe.com prices         │  │
-│  │  │   ├── Puppeteer v19 (headless + Cloudflare handler)  │  │
-│  │  │   ├── Cheerio parsing for table extraction           │  │
-│  │  │   ├── 3-retry logic (immediate, +30s, +60s delays)   │  │
-│  │  │   ├── Stores 7 Vietnamese coffee markets             │  │
-│  │  │   ├── findAll(filter: market/date/limit, max 365)    │  │
-│  │  │   └── findLatest() - most recent date's prices        │  │
-│  │  │                                                         │  │
-│  │  ├── CoffeePriceController                                │  │
-│  │  │   ├── GET /api/coffee-price (with query filters)      │  │
-│  │  │   └── GET /api/coffee-price/latest (JWT protected)   │  │
-│  │  │                                                         │  │
-│  │  ├── CoffeePrice entity (UUID PK, UNIQUE(date,market))  │  │
-│  │  ├── CoffeeMarket enum (7 markets + labels)             │  │
-│  │  └── QueryCoffeePriceDto (market, from, to, limit)      │  │
-│  │                                                         │  │
+│  │  ├── Daily @Cron scrape of giacaphe.com (Puppeteer)       │  │
+│  │  ├── GET /api/coffee-price (filters), /latest (JWT)       │  │
+│  │  └── CoffeePrice entity (date + market unique)            │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐  │
@@ -382,7 +335,24 @@
 │ userId: UUID (FK)│
 │ coordinates:jsonb│
 │ createdAt        │
-└────────┬─────────┘
+└────────┬────────────┬────────┘
+         │ (1:M)      │ (1:M)
+         │            │
+         ▼            ▼
+┌──────────────────────────┐
+│      Gateway             │
+├──────────────────────────┤
+│ id: UUID (PK)            │
+│ serial: str (unique)     │
+│ hardwareVersion: str     │
+│ firmwareVersion: str     │
+│ status: enum             │
+│ farmId: UUID (FK)        │
+│ lastSeenAt: timestamp    │
+│ mqttToken: str           │
+│ pairedAt, createdAt      │
+└──────────────────────────┘
+
          │ (1:M)
          │
          ▼
@@ -419,6 +389,7 @@
 │ deviceToken: str                 │
 │ operatingLifeHours: float        │
 │ totalOperatingHours: float       │
+│ lastSeenAt: timestamp (nullable) │
 │ provisionedAt, pairedAt          │
 │ createdAt, updatedAt             │
 └────────┬─────────────────────────┘
@@ -775,231 +746,60 @@ Topic: device/{deviceId}/resp
 Flow: Device → Backend (command response)
 Message: { "command": "PUMP_ON", "success": true, "duration": 300 }
 Sent after executing device/{deviceId}/cmd
+
+Topic: provision/gateway/new
+Flow: Gateway → Backend (gateway provisioning request)
+Message: { "serial": "GW-001", "nonce": "unique-id" }
+Response: provision/resp/{nonce}
+{ "token": "gateway-pairing-token-xyz", "expiresAt": "2026-02-26T12:00:00Z" }
+
+Topic: device/{deviceId}/status
+Flow: Type "heartbeat" updates Device.lastSeenAt; Type "lwt" (last-will) sets lastSeenAt = null
+Message: { "type": "heartbeat" } or { "reason": "lwt" }
+
+Topic: gateway/{gatewayId}/ota
+Flow: Backend → Gateway (OTA update)
+Message: { "url": "https://...", "checksum": "sha256:...", "version": "2.0.1" }
+
+Topic: gateway/{gatewayId}/device-ota
+Flow: Backend → Gateway → Device (device OTA routed through gateway)
+Message: { "deviceId": "dev-id", "url": "https://...", "checksum": "...", "version": "..." }
+```
+## Device & Gateway Online Status
+
+All devices and gateways report online status via `lastSeenAt` timestamp:
+
+```
+Online Check:  lastSeenAt != null AND (now - lastSeenAt) < 90 seconds
+
+Status Updates:
+┌─────────────────────────────┬──────────────────────────────────────┐
+│ MQTT Topic                  │ Effect                               │
+├─────────────────────────────┼──────────────────────────────────────┤
+│ device/{id}/status          │ Heartbeat: update Device.lastSeenAt  │
+│ (type: "heartbeat")         │ (prevents stale status)              │
+├─────────────────────────────┼──────────────────────────────────────┤
+│ device/{id}/status          │ LWT: set Device.lastSeenAt = null    │
+│ (reason: "lwt")             │ (device disconnected abnormally)     │
+├─────────────────────────────┼──────────────────────────────────────┤
+│ gateway/{gwId}/status       │ Heartbeat: update Gateway.lastSeenAt │
+│ (type: "heartbeat")         │ (same 90s window)                    │
+└─────────────────────────────┴──────────────────────────────────────┘
 ```
 
 ## WebSocket Events (Socket.IO /device Namespace)
 
-```
-Client → Server:
-────────────────
+**Client → Server:** `subscribeToDevice/{id}`, `subscribeToFarm/{id}`, `sendCommand(deviceId, command, params)` → joins room, broadcasts to device/farm rooms, or publishes MQTT command respectively.
 
-Event: subscribeToDevice
-Payload: { deviceId: string }
-Action: Client joins room 'device:{deviceId}'
-Effect: Client receives all events for this device
-
-Event: unsubscribeFromDevice
-Payload: { deviceId: string }
-Action: Client leaves room 'device:{deviceId}'
-
-Event: subscribeToFarm
-Payload: { farmId: string }
-Action: Client joins room 'farm:{farmId}'
-Effect: Client receives ALL device events (telemetry, status, alerts) from all devices in farm
-
-Event: unsubscribeFromFarm
-Payload: { farmId: string }
-Action: Client leaves room 'farm:{farmId}'
-
-Event: sendCommand
-Payload: { deviceId: string, command: string, params?: any }
-Action: Calls DeviceService.sendCommand()
-Effect: Command published to MQTT device/{id}/cmd
-
-
-Server → Client:
-────────────────
-
-Event: deviceData
-Broadcast to: device:{deviceId} + farm:{farmId} rooms
-Payload: { deviceId: string, sensorType: string, value: number, timestamp: date }
-Trigger: SyncService receives telemetry on device/+/telemetry
-Latency: < 100ms after MQTT message
-Note: Clients in both rooms receive once (Socket.IO union logic)
-
-Event: deviceStatus
-Broadcast to: device:{deviceId} + farm:{farmId} rooms
-Payload: { deviceId: string, status: enum, battery?: number, signal?: number }
-Trigger: SyncService receives message on device/+/status
-Latency: < 100ms
-
-Event: deviceAlert
-Broadcast to: device:{deviceId} + farm:{farmId} rooms
-Payload: { deviceId: string, sensorType: string, level: enum, value: number, threshold: number, action: string }
-Trigger: ThresholdService breaches threshold
-Latency: < 200ms after threshold detection
-
-Event: deviceProvisioned
-Broadcast to: all clients
-Payload: { deviceId: string, serial: string, expiresAt: date }
-Trigger: SyncService.handleProvisionRequest()
-
-Event: devicePaired
-Broadcast to: all clients
-Payload: { deviceId: string, farmId: string, status: "PAIRED" }
-Trigger: ProvisionService.pairDevice()
-```
+**Server → Client (broadcasts to device + farm rooms):** `deviceData` (telemetry), `deviceStatus` (battery/signal), `deviceAlert` (threshold breach, < 200ms latency), `deviceProvisioned`, `devicePaired`.
 
 ## Authentication Flow
 
-### JWT Dual-Token Strategy
+JWT dual-token strategy: short-lived `accessToken` (60m) via Bearer header, long-lived `refreshToken` (30d) via httpOnly cookie. Passwords hashed with bcryptjs (7 salt rounds). Token invalidation via `user.tokenVersion` increment on password change. Password reset flow: OTP email → verify OTP → reset password endpoint.
 
-```
-1. User Registration (POST /api/auth/signUp):
-   ─────────────────────────────────────
-   - Receive: { email, password, username }
-   - Validate input (email unique, password > 8 chars)
-   - Hash password with bcryptjs (7 salt rounds)
-   - Create User entity with tokenVersion = 0
-   - Return: { userId, email }
+## MQTT Device/Gateway Authentication (EMQX Integration)
 
-2. User Login (POST /api/auth/signIn):
-   ──────────────────────────────────
-   - Receive: { email, password }
-   - Validate credentials (bcrypt.compare)
-   - Generate tokens:
-     a) accessToken (short-lived)
-        - Payload: { sub: userId, tokenVersion }
-        - Expiry: 60 minutes
-        - Delivery: Bearer header
-     b) refreshToken (long-lived)
-        - Payload: { sub: userId, tokenVersion }
-        - Expiry: 30 days
-        - Delivery: httpOnly cookie (secure, sameSite)
-   - Return: { accessToken, user }
-            Cookie: refreshToken
-
-3. Protected Endpoint Access (with JwtAuthGuard):
-   ──────────────────────────────────────────────
-   - Client sends: Authorization: Bearer {accessToken}
-   - JwtStrategy validates token signature
-   - Extracts userId and tokenVersion
-   - Queries User and validates tokenVersion matches
-   - Injects user into request via @CurrentUser() decorator
-   - If token invalid/expired: return 401 Unauthorized
-
-4. Token Refresh (POST /api/auth/refresh-token):
-   ────────────────────────────────────────────
-   - Client sends: refreshToken in httpOnly cookie
-   - Validate refreshToken signature and expiry
-   - Validate user.tokenVersion matches token
-   - Generate new accessToken (same payload)
-   - Return: { accessToken }
-   - Cookie: refreshToken (refreshed)
-
-5. Password Change (POST /api/auth/change-password):
-   ────────────────────────────────────────────────
-   - Requires: JwtAuthGuard (authenticated)
-   - Receive: { oldPassword, newPassword }
-   - Validate old password (bcrypt.compare)
-   - Hash new password (7 salt rounds)
-   - Increment user.tokenVersion by 1
-   - Save to database
-   - Effect: All existing tokens invalidated (version mismatch)
-   - Client must re-login
-
-6. Password Reset Flow:
-   ─────────────────────
-   a) User requests reset (POST /api/auth/forgot-password):
-      - Receive: { email }
-      - Lookup user
-      - Generate 6-digit OTP
-      - Hash OTP with bcryptjs (7 salt rounds)
-      - Create ResetToken entity with otpHash
-      - Send OTP via email
-      - Return: success
-
-   b) User verifies OTP (POST /api/auth/verify-otp):
-      - Receive: { email, otp }
-      - Lookup ResetToken by email
-      - Compare OTP with otpHash (bcrypt.compare)
-      - Generate unique resetToken (UUID)
-      - Update ResetToken.resetToken = UUID
-      - Return: { resetToken }
-
-   c) User sets new password (POST /api/auth/reset-password):
-      - Receive: { resetToken, newPassword }
-      - Lookup ResetToken by resetToken UUID
-      - Validate not expired and not used
-      - Hash new password
-      - Update User.password
-      - Increment User.tokenVersion
-      - Mark ResetToken.used = true
-      - Return: success
-      - Effect: All existing tokens invalidated
-```
-
-## MQTT Device Authentication (EMQX Integration)
-
-```
-1. Device connects to MQTT broker with credentials:
-
-   First time (provisioning):
-   ──────────────────────────
-   MQTT Client Options:
-   {
-     clientId: "DEVICE-001",
-     username: "pairing_token_xyz",  ← pairing token
-     password: "" or ignored
-   }
-
-   After pairing:
-   ──────────────
-   MQTT Client Options:
-   {
-     clientId: "DEVICE-{deviceId}",
-     username: device.deviceToken,  ← device-specific token
-     password: "" or ignored
-   }
-
-2. EMQX receives connection and calls webhook:
-   POST http://backend/api/emqx/auth
-   {
-     clientid: "DEVICE-001",
-     username: "pairing_token_xyz",
-     password: "",
-     ip_addr: "192.168.1.100",
-     port: 1883
-   }
-
-3. Backend EmqxService validates:
-   - If username = pairing token:
-     a) Query PairingToken by token
-     b) Validate not expired, not used
-     c) Return: { allow: true }
-   - If username = device token:
-     a) Query Device by deviceToken
-     b) Validate status ≠ DISABLED
-     c) Return: { allow: true }
-   - Else:
-     - Return: { allow: false }
-
-4. EMQX grants/denies connection
-
-5. After successful connection, device subscribes to:
-   - device/{deviceId}/cmd (receive commands)
-   - Any other topics configured
-
-6. Device publishes to allowed topics:
-   - device/{deviceId}/status
-   - device/{deviceId}/telemetry
-   - device/{deviceId}/resp
-
-7. For publish/subscribe, EMQX calls ACL webhook:
-   POST http://backend/api/emqx/acl
-   {
-     clientid: "DEVICE-001",
-     username: "device_token_xyz",
-     topic: "device/abc-123/cmd",
-     action: "subscribe"  or  "publish"
-   }
-
-8. Backend EmqxService validates topic access:
-   - Device can publish to: device/{ownDeviceId}/*
-   - Device can subscribe to: device/{ownDeviceId}/*
-   - User (if using JWT) can access: farm/{ownFarmId}/*
-   - Return: { allow: true/false }
-```
+Device provisioning uses pairing token (username field), post-pairing uses device token (generated on pair). Gateway provisioning identical with gateway pairing token. EMQX auth webhook validates token expiry and device/gateway status (disabled = deny). ACL webhook enforces device topic isolation (`device/{id}/*`), gateway multi-device access (`device/+/*`, `provision/resp/+`, `gateway/{gwId}/ota`, `gateway/{gwId}/device-ota`), and JWT-authenticated user farm access (`farm/{ownFarmId}/*`).
 
 ---
 

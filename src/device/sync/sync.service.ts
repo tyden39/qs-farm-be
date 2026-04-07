@@ -134,6 +134,26 @@ export class SyncService implements OnModuleInit {
 
     this.logger.debug(`Processing device status from ${deviceId}`);
 
+    // Heartbeat: update lastSeenAt silently, no broadcast
+    if (payload.type === 'heartbeat') {
+      await this.deviceRepo.update(deviceId, { lastSeenAt: new Date() });
+      return;
+    }
+
+    // LWT: device disconnected — clear lastSeenAt immediately
+    if (payload.reason === 'lwt') {
+      await this.deviceRepo.update(deviceId, { lastSeenAt: null });
+      const { farmId } = await this.getDeviceIds(deviceId);
+      this.deviceGateway.broadcastDeviceStatus(
+        deviceId,
+        { ...payload, receivedAt: timestamp },
+        farmId,
+      );
+      this.eventEmitter.emit('pump.disconnected', { deviceId, farmId, timestamp });
+      this.eventEmitter.emit('fertilizer.disconnected', { deviceId, farmId, timestamp });
+      return;
+    }
+
     const { farmId } = await this.getDeviceIds(deviceId);
 
     this.deviceGateway.broadcastDeviceStatus(
@@ -144,20 +164,6 @@ export class SyncService implements OnModuleInit {
       },
       farmId,
     );
-
-    // LWT disconnect detection
-    if (payload.reason === 'lwt') {
-      this.eventEmitter.emit('pump.disconnected', {
-        deviceId,
-        farmId,
-        timestamp,
-      });
-      this.eventEmitter.emit('fertilizer.disconnected', {
-        deviceId,
-        farmId,
-        timestamp,
-      });
-    }
   }
 
   /**
@@ -167,6 +173,14 @@ export class SyncService implements OnModuleInit {
     const { deviceId, payload, timestamp } = message;
 
     this.logger.debug(`Processing telemetry from ${deviceId}`);
+
+    // Throttle lastSeenAt: only update if > 30s since last update
+    await this.deviceRepo
+      .createQueryBuilder()
+      .update()
+      .set({ lastSeenAt: () => 'NOW()' })
+      .where('id = :id AND (lastSeenAt IS NULL OR lastSeenAt < NOW() - INTERVAL \'30 seconds\')', { id: deviceId })
+      .execute();
 
     const { farmId, zoneId } = await this.getDeviceIds(deviceId);
 
@@ -415,10 +429,12 @@ export class SyncService implements OnModuleInit {
   }
 
   /**
-   * Check if device is online
+   * Check if device is online based on lastSeenAt (< 90s ago = online)
    */
   async isDeviceOnline(deviceId: string): Promise<boolean> {
-    return this.mqttService.isDeviceConnected(deviceId);
+    const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
+    if (!device?.lastSeenAt) return false;
+    return (Date.now() - device.lastSeenAt.getTime()) < 90_000;
   }
 
   /**

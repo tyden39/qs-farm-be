@@ -31,12 +31,16 @@ export class FirmwareUpdateLog {
   @Column({ length: 20, nullable: true })
   firmwareVersion: string | null;
 
-  @Column('uuid')
-  deviceId: string;
+  @Column({ type: 'uuid', nullable: true })
+  deviceId: string | null;
 
-  @ManyToOne(() => Device, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Device, { nullable: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'deviceId' })
   device: Device;
+
+  // Set when OTA targets a gateway
+  @Column({ type: 'uuid', nullable: true })
+  gatewayId: string | null;
 
   @Column({ length: 20, nullable: true })
   previousVersion: string;

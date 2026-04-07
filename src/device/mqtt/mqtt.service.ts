@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as mqtt from 'mqtt';
 
 export interface MqttMessage {
@@ -13,6 +14,8 @@ export class MqttService implements OnModuleInit {
   private readonly logger = new Logger(MqttService.name);
   private client: mqtt.MqttClient;
   private messageCallbacks: Map<string, Function[]> = new Map();
+
+  constructor(private readonly eventEmitter: EventEmitter2) {}
 
   async onModuleInit() {
     await this.connect();
@@ -90,6 +93,24 @@ export class MqttService implements OnModuleInit {
         this.logger.log('Subscribed to device/+/resp');
       }
     });
+
+    // Gateway provisioning
+    this.client.subscribe('provision/gateway/new', (err) => {
+      if (err) {
+        this.logger.error('Failed to subscribe to provision/gateway/new', err);
+      } else {
+        this.logger.log('Subscribed to provision/gateway/new');
+      }
+    });
+
+    // Gateway status (heartbeat + LWT)
+    this.client.subscribe('gateway/+/status', (err) => {
+      if (err) {
+        this.logger.error('Failed to subscribe to gateway/+/status', err);
+      } else {
+        this.logger.log('Subscribed to gateway/+/status');
+      }
+    });
   }
 
   private handleMessage(topic: string, message: Buffer) {
@@ -105,6 +126,18 @@ export class MqttService implements OnModuleInit {
       };
 
       // this.logger.debug(`Received MQTT message from ${deviceId}:`, payload);
+
+      // Emit gateway events directly via EventEmitter
+      if (topic === 'provision/gateway/new') {
+        this.eventEmitter.emit('gateway.provision.requested', payload);
+        return;
+      }
+
+      if (topic.startsWith('gateway/') && topic.endsWith('/status')) {
+        const gatewayId = topic.split('/')[1];
+        this.eventEmitter.emit('gateway.status.received', { gatewayId, payload, timestamp: new Date() });
+        return;
+      }
 
       // Collect matching callbacks (exact match + wildcard pattern match + global '*')
       const matchedCallbacks: Function[] = [];
@@ -208,15 +241,6 @@ export class MqttService implements OnModuleInit {
     };
 
     return this.publishToTopic(topic, payload);
-  }
-
-  /**
-   * Check if device is connected (based on last message time)
-   */
-  async isDeviceConnected(deviceId: string): Promise<boolean> {
-    // This is a simple check - you might want to implement a more sophisticated
-    // presence system using MQTT's Last Will and Testament (LWT) feature
-    return this.client && this.client.connected;
   }
 
   async disconnect() {

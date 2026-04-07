@@ -61,6 +61,13 @@ export class Device {
   @Column({ nullable: true })
   pairedAt: Date;
 
+  @Column({ type: 'timestamp', nullable: true })
+  lastSeenAt: Date;
+
+  // Gateway that this device connects through (null = direct WiFi)
+  @Column('uuid', { nullable: true })
+  gatewayId: string;
+
   @Column({ type: 'float', nullable: true })
   operatingLifeHours: number;
 

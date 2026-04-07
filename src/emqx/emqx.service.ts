@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Device, DeviceStatus } from 'src/device/entities/device.entity';
 import { Farm } from 'src/farm/entities/farm.entity';
+import { Gateway, GatewayStatus } from 'src/gateway/entities/gateway.entity';
 import { UserService } from 'src/user/user.service';
 import { EmqxAuthDto } from './dto/emqx-auth.dto';
 import { EmqxAclDto } from './dto/emqx-acl.dto';
@@ -17,6 +18,8 @@ export class EmqxService {
     private readonly deviceRepository: Repository<Device>,
     @InjectRepository(Farm)
     private readonly farmRepository: Repository<Farm>,
+    @InjectRepository(Gateway)
+    private readonly gatewayRepository: Repository<Gateway>,
     private readonly jwtService: JwtService,
     private readonly userService: UserService,
   ) {}
@@ -50,6 +53,21 @@ export class EmqxService {
         }
 
         return false;
+      }
+
+      // Case 1.5: Gateway authentication — username format: gateway:{gatewayId}
+      if (username.startsWith('gateway:')) {
+        const gwId = username.replace('gateway:', '');
+        const gateway = await this.gatewayRepository.findOne({ where: { id: gwId } });
+
+        if (!gateway?.mqttToken || gateway.status === GatewayStatus.DISABLED) {
+          this.logger.warn(`Gateway auth failed: ${gwId}`);
+          return false;
+        }
+
+        const ok = gateway.mqttToken === password;
+        if (ok) this.logger.log(`Gateway authenticated: ${gwId}`);
+        return ok;
       }
 
       // Case 2: User authentication with JWT
@@ -89,6 +107,11 @@ export class EmqxService {
     try {
       const { username, topic, access } = body;
 
+      // Gateway access control
+      if (username.startsWith('gateway:')) {
+        return this.checkGatewayAcl(username, topic, access);
+      }
+
       // Device access control
       if (username.startsWith('device:')) {
         return this.checkDeviceAcl(username, topic, access);
@@ -100,6 +123,33 @@ export class EmqxService {
       this.logger.error('ACL check error:', error);
       return false;
     }
+  }
+
+  private checkGatewayAcl(username: string, topic: string, access: number): boolean {
+    const gwId = username.replace('gateway:', '');
+
+    // PUBLISH
+    if (access === 2) {
+      return (
+        topic.startsWith('device/') ||
+        topic === 'provision/new' ||
+        topic === 'provision/gateway/new' ||
+        topic === `gateway/${gwId}/status`
+      );
+    }
+
+    // SUBSCRIBE
+    if (access === 1) {
+      return (
+        topic.startsWith('device/') ||
+        topic.startsWith('provision/resp/') ||
+        topic.startsWith('provision/gateway/resp/') ||
+        topic === `gateway/${gwId}/ota` ||
+        topic === `gateway/${gwId}/device-ota`
+      );
+    }
+
+    return false;
   }
 
   /**

@@ -10,6 +10,7 @@ import { FirmwareController } from './firmware.controller';
 import { FirmwareService } from './firmware.service';
 import { DeviceModule } from 'src/device/device.module';
 import { FarmModule } from 'src/farm/farm.module';
+import { GatewayModule } from 'src/gateway/gateway.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { FarmModule } from 'src/farm/farm.module';
     }),
     DeviceModule,
     FarmModule,
+    GatewayModule,
   ],
   controllers: [FirmwareController],
   providers: [FirmwareService],

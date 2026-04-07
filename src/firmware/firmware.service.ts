@@ -19,11 +19,13 @@ import { UpdateFirmwareDto } from './dto/update-firmware.dto';
 import { DeviceGateway } from 'src/device/websocket/device.gateway';
 import { DeviceService } from 'src/device/device.service';
 import { SyncService } from 'src/device/sync/sync.service';
+import { MqttService } from 'src/device/mqtt/mqtt.service';
 import { CheckUpdateQueryDto } from './dto/check-update-query.dto';
 import { DeployFirmwareDto } from './dto/deploy-firmware.dto';
 import { FirmwareUpdateStatus } from './entities/firmware-update-log.entity';
 import { DeviceStatus } from 'src/device/entities/device.entity';
 import { FarmService } from 'src/farm/farm.service';
+import { GatewayService } from 'src/gateway/gateway.service';
 
 @Injectable()
 export class FirmwareService {
@@ -37,7 +39,9 @@ export class FirmwareService {
     private readonly deviceGateway: DeviceGateway,
     private readonly deviceService: DeviceService,
     private readonly syncService: SyncService,
+    private readonly mqttService: MqttService,
     private readonly farmService: FarmService,
+    private readonly gatewayService: GatewayService,
   ) {}
 
   async upload(
@@ -216,18 +220,33 @@ export class FirmwareService {
         }),
       );
 
-      // Send OTA command via MQTT
+      // Send OTA command via MQTT — route through gateway if device has one
       try {
         this.logger.log(
           `Sending OTA command: device=${device.id} firmware=${firmware.version}`,
         );
-        await this.syncService.sendCommandToDevice(device.id, 'OTA_UPDATE', {
-          version: firmware.version,
-          downloadUrl: `/api/firmware/download/${firmware.id}`,
-          checksum: firmware.checksum,
-          checksumAlgorithm: 'md5',
-          fileSize: firmware.fileSize,
-        });
+
+        if ((device as any).gatewayId) {
+          // Device connects via LoRa gateway — use device-ota topic
+          await this.mqttService.publishToTopic(
+            `gateway/${(device as any).gatewayId}/device-ota`,
+            {
+              deviceId: device.id,
+              url: `${process.env.SERVER_URL}/api/firmware/download/${firmware.id}`,
+              checksum: firmware.checksum,
+              version: firmware.version,
+              ts: new Date().toISOString(),
+            },
+          );
+        } else {
+          await this.syncService.sendCommandToDevice(device.id, 'OTA_UPDATE', {
+            version: firmware.version,
+            downloadUrl: `/api/firmware/download/${firmware.id}`,
+            checksum: firmware.checksum,
+            checksumAlgorithm: 'md5',
+            fileSize: firmware.fileSize,
+          });
+        }
         results.push({ deviceId: device.id, logId: log.id, status: 'sent' });
       } catch (error: any) {
         log.status = FirmwareUpdateStatus.FAILED;
@@ -364,10 +383,18 @@ export class FirmwareService {
     firmwareId: string;
     deviceIds?: string[];
     farmId?: string;
+    gatewayIds?: string[];
     userId: string;
     socketId: string;
   }) {
     try {
+      // Gateway OTA takes priority
+      if (data.gatewayIds?.length) {
+        const result = await this.deployToGateways(data.firmwareId, data.gatewayIds);
+        this.deviceGateway.server.to(data.socketId).emit('firmwareUpdateAck', result);
+        return;
+      }
+
       const result = await this.deployForUser(
         data.firmwareId,
         { deviceIds: data.deviceIds, farmId: data.farmId },
@@ -382,6 +409,40 @@ export class FirmwareService {
         .to(data.socketId)
         .emit('firmwareUpdateError', { message: error.message });
     }
+  }
+
+  private async deployToGateways(firmwareId: string, gatewayIds: string[]) {
+    const firmware = await this.findOne(firmwareId);
+    const results = [];
+
+    for (const gwId of gatewayIds) {
+      const log = await this.updateLogRepository.save(
+        this.updateLogRepository.create({
+          firmwareId: firmware.id,
+          firmwareVersion: firmware.version,
+          deviceId: null,
+          gatewayId: gwId,
+          status: FirmwareUpdateStatus.PENDING,
+        }),
+      );
+
+      try {
+        await this.mqttService.publishToTopic(`gateway/${gwId}/ota`, {
+          url: `${process.env.SERVER_URL}/api/firmware/download/${firmware.id}`,
+          checksum: firmware.checksum,
+          version: firmware.version,
+          ts: new Date().toISOString(),
+        });
+        results.push({ gatewayId: gwId, logId: log.id, status: 'sent' });
+      } catch (error: any) {
+        log.status = FirmwareUpdateStatus.FAILED;
+        log.errorMessage = error.message;
+        await this.updateLogRepository.save(log);
+        results.push({ gatewayId: gwId, logId: log.id, status: 'failed', error: error.message });
+      }
+    }
+
+    return { firmwareId: firmware.id, version: firmware.version, results };
   }
 
   async getUpdateLogs(filters: {

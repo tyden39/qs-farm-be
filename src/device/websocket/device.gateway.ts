@@ -149,7 +149,7 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleRequestFirmwareUpdate(
     @ConnectedSocket() client: Socket,
     @MessageBody()
-    data: { firmwareId: string; deviceIds?: string[]; farmId?: string },
+    data: { firmwareId: string; deviceIds?: string[]; farmId?: string; gatewayIds?: string[] },
   ) {
     const userId = client.data.userId;
     if (!userId) {
@@ -163,6 +163,7 @@ export class DeviceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       firmwareId: data.firmwareId,
       deviceIds: data.deviceIds,
       farmId: data.farmId,
+      gatewayIds: data.gatewayIds,
       userId,
       socketId: client.id,
     });

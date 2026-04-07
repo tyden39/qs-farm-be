@@ -20,6 +20,7 @@ import { CoffeePriceModule } from './coffee-price/coffee-price.module';
 import { PumpModule } from './pump/pump.module';
 import { FertilizerModule } from './fertilizer/fertilizer.module';
 import { ZoneModule } from './zone/zone.module';
+import { GatewayModule } from './gateway/gateway.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { ZoneModule } from './zone/zone.module';
     PumpModule,
     FertilizerModule,
     ZoneModule,
+    GatewayModule,
   ],
   providers: [],
 })

@@ -37,6 +37,13 @@ export class Firmware {
   @Column({ type: 'text', nullable: true })
   releaseNotes: string;
 
+  @Column({
+    type: 'enum',
+    enum: ['device', 'gateway'],
+    default: 'device',
+  })
+  targetType: 'device' | 'gateway';
+
   @Column({ default: false })
   isPublished: boolean;
 
