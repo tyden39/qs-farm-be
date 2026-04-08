@@ -220,33 +220,34 @@ export class FirmwareService {
         }),
       );
 
-      // Send OTA command via MQTT — route through gateway if device has one
+      // Send OTA command via MQTT — dual-channel when device has gateway
       try {
         this.logger.log(
           `Sending OTA command: device=${device.id} firmware=${firmware.version}`,
         );
 
-        if ((device as any).gatewayId) {
-          // Device connects via LoRa gateway — use device-ota topic
+        // Unified payload used on both channels; gateway extracts deviceId for routing
+        const otaPayload = {
+          deviceId: device.id,
+          version: firmware.version,
+          url: `/api/firmware/download/${firmware.id}`,
+          checksum: firmware.checksum,
+          checksumAlgorithm: 'md5',
+          fileSize: firmware.fileSize,
+          ts: new Date().toISOString(),
+        };
+
+        // Always send via WiFi direct channel
+        await this.syncService.sendCommandToDevice(device.id, 'OTA_UPDATE', otaPayload);
+
+        // Also send via LoRa gateway channel when device has one (firmware ignores duplicate via version check)
+        if (device.gatewayId) {
           await this.mqttService.publishToTopic(
-            `gateway/${(device as any).gatewayId}/device-ota`,
-            {
-              deviceId: device.id,
-              url: `${process.env.SERVER_URL}/api/firmware/download/${firmware.id}`,
-              checksum: firmware.checksum,
-              version: firmware.version,
-              ts: new Date().toISOString(),
-            },
+            `gateway/${device.gatewayId}/device-ota`,
+            otaPayload,
           );
-        } else {
-          await this.syncService.sendCommandToDevice(device.id, 'OTA_UPDATE', {
-            version: firmware.version,
-            downloadUrl: `/api/firmware/download/${firmware.id}`,
-            checksum: firmware.checksum,
-            checksumAlgorithm: 'md5',
-            fileSize: firmware.fileSize,
-          });
         }
+
         results.push({ deviceId: device.id, logId: log.id, status: 'sent' });
       } catch (error: any) {
         log.status = FirmwareUpdateStatus.FAILED;

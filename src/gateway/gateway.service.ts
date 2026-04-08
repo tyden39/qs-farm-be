@@ -5,15 +5,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, Not } from 'typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomBytes } from 'crypto';
 import { Gateway, GatewayStatus } from './entities/gateway.entity';
-import { Device } from 'src/device/entities/device.entity';
+import { Device, DeviceStatus } from 'src/device/entities/device.entity';
 import { MqttService } from 'src/device/mqtt/mqtt.service';
 import { PairGatewayDto } from './dto/pair-gateway.dto';
-import { AssignDevicesDto } from './dto/assign-devices.dto';
 
 @Injectable()
 export class GatewayService {
@@ -25,7 +23,6 @@ export class GatewayService {
     @InjectRepository(Device)
     private readonly deviceRepository: Repository<Device>,
     private readonly mqttService: MqttService,
-    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -101,6 +98,13 @@ export class GatewayService {
 
     await this.gatewayRepository.save(gateway);
 
+    // Bulk assign all active farm devices to this gateway (bidirectional auto-assign)
+    const updateResult = await this.deviceRepository.update(
+      { farmId: dto.farmId, status: Not(DeviceStatus.DISABLED) },
+      { gatewayId: gateway.id },
+    );
+    this.logger.log(`Gateway ${gateway.id}: auto-assigned ${updateResult.affected ?? 0} farm devices`);
+
     // Publish credentials back to gateway using stored nonce
     await this.mqttService.publishToTopic(`provision/gateway/resp/${gateway.nonce}`, {
       gatewayId: gateway.id,
@@ -109,6 +113,20 @@ export class GatewayService {
 
     this.logger.log(`Gateway paired: id=${gateway.id} farmId=${dto.farmId}`);
     return { gatewayId: gateway.id, mqttToken };
+  }
+
+  /**
+   * Unpair gateway from farm — nulls gatewayId on all assigned devices
+   */
+  async deleteGateway(id: string): Promise<void> {
+    const gateway = await this.findOne(id);
+
+    // Release all assigned devices before removing gateway
+    await this.deviceRepository.update({ gatewayId: id }, { gatewayId: null });
+    this.logger.log(`Gateway ${id}: released all assigned devices`);
+
+    await this.gatewayRepository.remove(gateway);
+    this.logger.log(`Gateway deleted: ${id}`);
   }
 
   async findByFarm(farmId: string): Promise<Gateway[]> {
@@ -144,36 +162,6 @@ export class GatewayService {
     }
   }
 
-  async assignDevices(gatewayId: string, dto: AssignDevicesDto): Promise<{ assigned: number }> {
-    const gateway = await this.findOne(gatewayId);
-
-    const devices = await this.deviceRepository.find({
-      where: { id: In(dto.deviceIds), farmId: gateway.farmId },
-    });
-
-    if (devices.length === 0) {
-      throw new BadRequestException('No valid devices found in same farm');
-    }
-
-    await this.deviceRepository.update(
-      { id: In(devices.map((d) => d.id)) },
-      { gatewayId },
-    );
-
-    this.eventEmitter.emit('gateway.devices.changed', { gatewayId });
-    return { assigned: devices.length };
-  }
-
-  async unassignDevices(gatewayId: string, dto: AssignDevicesDto): Promise<{ unassigned: number }> {
-    const result = await this.deviceRepository.update(
-      { id: In(dto.deviceIds), gatewayId },
-      { gatewayId: null },
-    );
-
-    this.eventEmitter.emit('gateway.devices.changed', { gatewayId });
-    return { unassigned: result.affected || 0 };
-  }
-
   async findDevicesByGateway(gatewayId: string): Promise<Device[]> {
     return this.deviceRepository.find({ where: { gatewayId } });
   }
@@ -183,47 +171,4 @@ export class GatewayService {
     return (Date.now() - gateway.lastSeenAt.getTime()) < 90_000;
   }
 
-  @OnEvent('gateway.devices.reported')
-  async handleDevicesReported(data: { gatewayId: string; payload: { devices: string[] } }) {
-    const { gatewayId, payload } = data;
-    const serials = payload.devices;
-
-    if (!Array.isArray(serials) || serials.length === 0) return;
-
-    try {
-      const gateway = await this.gatewayRepository.findOne({ where: { id: gatewayId } });
-      if (!gateway?.farmId) {
-        this.logger.warn(`Gateway ${gatewayId} not paired to farm, ignoring device report`);
-        return;
-      }
-
-      const devices = await this.deviceRepository.find({
-        where: { serial: In(serials), farmId: gateway.farmId },
-      });
-
-      const toAssign = devices.filter((d) => !d.gatewayId || d.gatewayId === gatewayId);
-      const skipped = devices.filter((d) => d.gatewayId && d.gatewayId !== gatewayId);
-
-      if (skipped.length > 0) {
-        this.logger.warn(
-          `Gateway ${gatewayId}: ${skipped.length} devices already assigned to other gateways`,
-        );
-      }
-
-      const newAssign = toAssign.filter((d) => d.gatewayId !== gatewayId);
-      if (newAssign.length === 0) return;
-
-      await this.deviceRepository.update(
-        { id: In(newAssign.map((d) => d.id)) },
-        { gatewayId },
-      );
-
-      this.eventEmitter.emit('gateway.devices.changed', { gatewayId });
-      this.logger.log(
-        `Gateway ${gatewayId}: auto-assigned ${newAssign.length} devices [${newAssign.map((d) => d.serial).join(', ')}]`,
-      );
-    } catch (error) {
-      this.logger.error(`Gateway device report error: ${error.message}`);
-    }
-  }
 }

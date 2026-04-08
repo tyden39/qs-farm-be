@@ -112,14 +112,6 @@ export class MqttService implements OnModuleInit {
       }
     });
 
-    // Gateway auto-discovery device reports
-    this.client.subscribe('gateway/+/devices/report', (err) => {
-      if (err) {
-        this.logger.error('Failed to subscribe to gateway/+/devices/report', err);
-      } else {
-        this.logger.log('Subscribed to gateway/+/devices/report');
-      }
-    });
   }
 
   private handleMessage(topic: string, message: Buffer) {
@@ -145,12 +137,6 @@ export class MqttService implements OnModuleInit {
       if (topic.startsWith('gateway/') && topic.endsWith('/status')) {
         const gatewayId = topic.split('/')[1];
         this.eventEmitter.emit('gateway.status.received', { gatewayId, payload, timestamp: new Date() });
-        return;
-      }
-
-      if (topic.match(/^gateway\/[^/]+\/devices\/report$/)) {
-        const gatewayId = topic.split('/')[1];
-        this.eventEmitter.emit('gateway.devices.reported', { gatewayId, payload });
         return;
       }
 

@@ -5,10 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import { Device, DeviceStatus } from 'src/device/entities/device.entity';
 import { PairingToken } from 'src/device/entities/pairing-token.entity';
+import { Gateway, GatewayStatus } from 'src/gateway/entities/gateway.entity';
 import { MqttService } from 'src/device/mqtt/mqtt.service';
 import { ProvisionRequestDto } from './dto/provision-request.dto';
 import { PairDeviceDto } from './dto/pair-device.dto';
@@ -22,6 +23,8 @@ export class ProvisionService {
     private readonly deviceRepository: Repository<Device>,
     @InjectRepository(PairingToken)
     private readonly pairingTokenRepository: Repository<PairingToken>,
+    @InjectRepository(Gateway)
+    private readonly gatewayRepository: Repository<Gateway>,
     private readonly mqttService: MqttService,
   ) {}
 
@@ -175,12 +178,19 @@ export class ProvisionService {
       // Generate device token for MQTT authentication
       const deviceToken = this.generateDeviceToken();
 
+      // Find farm's active gateway for bidirectional auto-assign (1 farm = max 1 gateway)
+      const gateway = await this.gatewayRepository.findOne({
+        where: { farmId, status: Not(GatewayStatus.DISABLED) },
+      });
+      const gatewayId = gateway?.id ?? null;
+
       // Update device – only set farmId (not farm relation) to avoid "multiple assignments" error
       await this.deviceRepository.update(device.id, {
         farmId,
         deviceToken,
         status: DeviceStatus.PAIRED,
         pairedAt: new Date(),
+        gatewayId,
       });
 
       // Mark pairing token as used
@@ -188,10 +198,10 @@ export class ProvisionService {
         used: true,
       });
 
-      this.logger.log(`Device paired: ${serial} (${device.id})`);
+      this.logger.log(`Device paired: ${serial} (${device.id}) gatewayId=${gatewayId ?? 'none'}`);
 
-      // Send set_owner command to device via MQTT
-      await this.publishSetOwnerCommand(device.id, userId, deviceToken, farmId);
+      // Send set_owner command to device via MQTT (includes gatewayId for firmware routing)
+      await this.publishSetOwnerCommand(device.id, userId, deviceToken, farmId, gatewayId);
 
       return {
         deviceId: device.id,
@@ -431,13 +441,15 @@ export class ProvisionService {
     userId: string,
     deviceToken: string,
     farmId: string,
+    gatewayId: string | null,
   ) {
     try {
       await this.mqttService.publishToTopic(`device/${deviceId}/cmd`, {
         cmd: 'set_owner',
         ownerId: userId,
-        farmId: farmId,
+        farmId,
         token: deviceToken,
+        gatewayId: gatewayId ?? null,
         timestamp: new Date().toISOString(),
       });
 

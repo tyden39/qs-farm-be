@@ -1,9 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Param, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { GatewayService } from './gateway.service';
 import { PairGatewayDto } from './dto/pair-gateway.dto';
-import { AssignDevicesDto } from './dto/assign-devices.dto';
 
 @ApiTags('Gateways')
 @Controller()
@@ -33,16 +32,10 @@ export class GatewayController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Post('gateways/:id/devices')
-  async assignDevices(@Param('id') id: string, @Body() dto: AssignDevicesDto) {
-    return this.gatewayService.assignDevices(id, dto);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @Delete('gateways/:id/devices')
-  async unassignDevices(@Param('id') id: string, @Body() dto: AssignDevicesDto) {
-    return this.gatewayService.unassignDevices(id, dto);
+  @Delete('gateways/:id')
+  @HttpCode(204)
+  async deleteGateway(@Param('id') id: string) {
+    return this.gatewayService.deleteGateway(id);
   }
 
   @UseGuards(JwtAuthGuard)

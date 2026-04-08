@@ -53,11 +53,6 @@ export class EmqxService {
         // Simple token comparison for static tokens
         const tokenMatches = device.deviceToken === password;
         if (tokenMatches && device.status !== DeviceStatus.DISABLED) {
-          // Block direct connect if device is assigned to a gateway
-          if (device.gatewayId) {
-            this.logger.warn(`Device ${username} blocked: must connect through gateway ${device.gatewayId}`);
-            return false;
-          }
           this.logger.log(`Device authenticated: ${username}`);
           return true;
         }
@@ -142,8 +137,6 @@ export class EmqxService {
     if (access === 2) {
       if (topic === `gateway/${gwId}/status`) return true;
       if (topic === 'provision/gateway/new') return true;
-      if (topic === `gateway/${gwId}/devices/report`) return true;
-      if (topic === 'provision/new') return true;
 
       // Device topics — gateway must own the device
       if (topic.startsWith('device/')) {
@@ -163,7 +156,6 @@ export class EmqxService {
     if (access === 1) {
       if (topic === `gateway/${gwId}/ota`) return true;
       if (topic === `gateway/${gwId}/device-ota`) return true;
-      if (topic.startsWith('provision/resp/')) return true;
       if (topic.startsWith('provision/gateway/resp/')) return true;
 
       // Device topics — allow wildcard only for command topic, validate ownership otherwise
