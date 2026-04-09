@@ -228,13 +228,16 @@ export class MqttService implements OnModuleInit {
   }
 
   /**
-   * Publish message to device via MQTT
-   * @param deviceId - Device ID
-   * @param command - Command name
-   * @param data - Command data
+   * Publish command to device via MQTT.
+   * If gatewayId is provided (LoRa mode), publishes to scoped topic:
+   *   gateway/{gatewayId}/device/{deviceId}/cmd
+   * Otherwise (WiFi direct), publishes to:
+   *   device/{deviceId}/cmd
    */
-  async publishToDevice(deviceId: string, command: string, data: any) {
-    const topic = `device/${deviceId}/cmd`;
+  async publishToDevice(deviceId: string, command: string, data: any, gatewayId?: string | null) {
+    const topic = gatewayId
+      ? `gateway/${gatewayId}/device/${deviceId}/cmd`
+      : `device/${deviceId}/cmd`;
     const payload = {
       command,
       data,

@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 
 import { MqttService } from 'src/device/mqtt/mqtt.service';
 import { DeviceGateway } from 'src/device/websocket/device.gateway';
+import { Device } from 'src/device/entities/device.entity';
 import { Farm } from 'src/farm/entities/farm.entity';
 import { SensorConfig } from './entities/sensor-config.entity';
 import { AlertLog, AlertDirection } from './entities/alert-log.entity';
@@ -47,6 +48,8 @@ export class ThresholdService {
     private readonly commandLogRepo: Repository<CommandLog>,
     @InjectRepository(Farm)
     private readonly farmRepo: Repository<Farm>,
+    @InjectRepository(Device)
+    private readonly deviceRepo: Repository<Device>,
   ) {}
 
   private async getFarmOwnerId(farmId: string): Promise<string | null> {
@@ -121,13 +124,14 @@ export class ThresholdService {
       // Dispatch command (skip if ALERT_ONLY)
       if (threshold.action !== 'ALERT_ONLY') {
         try {
+          const device = await this.deviceRepo.findOne({ where: { id: deviceId }, select: ['id', 'gatewayId'] });
           await this.mqttService.publishToDevice(deviceId, threshold.action, {
             reason,
             sensorType,
             level: threshold.level,
             value,
             threshold: thresholdValue,
-          });
+          }, device?.gatewayId);
 
           this.deviceGateway.broadcastDeviceData(
             deviceId,

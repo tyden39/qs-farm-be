@@ -158,13 +158,15 @@ export class EmqxService {
       if (topic === `gateway/${gwId}/device-ota`) return true;
       if (topic.startsWith('provision/gateway/resp/')) return true;
 
-      // Device topics — allow wildcard only for command topic, validate ownership otherwise
+      // Scoped gateway command topic: gateway/{gwId}/device/+/cmd
+      // Gateway subscribes only to its own command scope — no cross-tenant leakage
+      if (topic === `gateway/${gwId}/device/+/cmd`) return true;
+
+      // Device topics — validate ownership (wildcard cmd denied, must use scoped topic above)
       if (topic.startsWith('device/')) {
         const parts = topic.split('/');
         const deviceId = parts[1];
-        // Gateway subscribes device/+/cmd to receive commands for all its devices
-        if (deviceId === '+' && parts[2] === 'cmd') return true;
-        if (deviceId === '+') return false;
+        if (deviceId === '+') return false; // wildcard denied
         const deviceIds = await this.getGatewayDeviceIds(gwId);
         return deviceIds.has(deviceId);
       }

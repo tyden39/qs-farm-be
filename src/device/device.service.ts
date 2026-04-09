@@ -97,7 +97,7 @@ export class DeviceService {
     const device = await this.findOne(id);
     // Best-effort: send factory_reset before deleting; ignore if device is offline
     try {
-      await this.mqttService.publishToDevice(device.id, 'factory_reset', {});
+      await this.mqttService.publishToDevice(device.id, 'factory_reset', {}, device.gatewayId);
       this.logger.log(`factory_reset sent to device ${device.id}`);
     } catch (err: any) {
       this.logger.warn(`factory_reset not delivered to device ${device.id}: ${err.message}`);

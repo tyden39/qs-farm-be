@@ -36,6 +36,7 @@ describe('SyncService — fertilizer guard', () => {
       id: 'device-1',
       farmId: 'farm-1',
       zoneId: null,
+      gatewayId: null,
       hasFertilizer: false,
     } as Partial<Device>);
 
@@ -59,6 +60,7 @@ describe('SyncService — fertilizer guard', () => {
       mockDeviceRepo.findOne.mockResolvedValue({
         farmId: 'farm-1',
         zoneId: null,
+        gatewayId: null,
         hasFertilizer: false,
       });
 
@@ -73,6 +75,7 @@ describe('SyncService — fertilizer guard', () => {
       mockDeviceRepo.findOne.mockResolvedValue({
         farmId: 'farm-1',
         zoneId: null,
+        gatewayId: null,
         hasFertilizer: false,
       });
 
@@ -85,6 +88,7 @@ describe('SyncService — fertilizer guard', () => {
       mockDeviceRepo.findOne.mockResolvedValue({
         farmId: 'farm-1',
         zoneId: null,
+        gatewayId: null,
         hasFertilizer: true,
       });
       mockMqttService.publishToDevice.mockResolvedValue(undefined);
@@ -103,6 +107,7 @@ describe('SyncService — fertilizer guard', () => {
         'device-1',
         'fertilizer_on',
         {},
+        null, // WiFi device — no gatewayId
       );
     });
 
@@ -111,6 +116,7 @@ describe('SyncService — fertilizer guard', () => {
       mockDeviceRepo.findOne.mockResolvedValue({
         farmId: 'farm-1',
         zoneId: null,
+        gatewayId: null,
         hasFertilizer: false,
       });
       mockMqttService.publishToDevice.mockResolvedValue(undefined);
@@ -125,11 +131,51 @@ describe('SyncService — fertilizer guard', () => {
         success: true,
         message: 'Command sent to device',
       });
-      // findOne called at most once (for the ID cache), never for guard check on pump_on
       expect(mockMqttService.publishToDevice).toHaveBeenCalledWith(
         'device-1',
         'pump_on',
         {},
+        null, // WiFi device — no gatewayId
+      );
+    });
+  });
+
+  describe('sendCommandToDevice — topic routing', () => {
+    it('routes via device/{id}/cmd when gatewayId is null (WiFi direct)', async () => {
+      mockDeviceRepo.findOne.mockResolvedValue({
+        farmId: 'farm-1',
+        zoneId: null,
+        gatewayId: null,
+        hasFertilizer: false,
+      });
+      mockMqttService.publishToDevice.mockResolvedValue(undefined);
+
+      await service.sendCommandToDevice('device-1', 'pump_on', {});
+
+      expect(mockMqttService.publishToDevice).toHaveBeenCalledWith(
+        'device-1',
+        'pump_on',
+        {},
+        null,
+      );
+    });
+
+    it('routes via gateway/{gwId}/device/{id}/cmd when gatewayId is set (LoRa mode)', async () => {
+      mockDeviceRepo.findOne.mockResolvedValue({
+        farmId: 'farm-1',
+        zoneId: null,
+        gatewayId: 'gw-abc',
+        hasFertilizer: false,
+      });
+      mockMqttService.publishToDevice.mockResolvedValue(undefined);
+
+      await service.sendCommandToDevice('device-1', 'pump_on', {});
+
+      expect(mockMqttService.publishToDevice).toHaveBeenCalledWith(
+        'device-1',
+        'pump_on',
+        {},
+        'gw-abc',
       );
     });
   });
