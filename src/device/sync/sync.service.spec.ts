@@ -37,6 +37,7 @@ describe('SyncService — fertilizer guard', () => {
       farmId: 'farm-1',
       zoneId: null,
       gatewayId: null,
+      serial: null,
       hasFertilizer: false,
     } as Partial<Device>);
 
@@ -61,6 +62,7 @@ describe('SyncService — fertilizer guard', () => {
         farmId: 'farm-1',
         zoneId: null,
         gatewayId: null,
+        serial: null,
         hasFertilizer: false,
       });
 
@@ -76,6 +78,7 @@ describe('SyncService — fertilizer guard', () => {
         farmId: 'farm-1',
         zoneId: null,
         gatewayId: null,
+        serial: null,
         hasFertilizer: false,
       });
 
@@ -89,6 +92,7 @@ describe('SyncService — fertilizer guard', () => {
         farmId: 'farm-1',
         zoneId: null,
         gatewayId: null,
+        serial: null,
         hasFertilizer: true,
       });
       mockMqttService.publishToDevice.mockResolvedValue(undefined);
@@ -108,6 +112,7 @@ describe('SyncService — fertilizer guard', () => {
         'fertilizer_on',
         {},
         null, // WiFi device — no gatewayId
+        null, // no serial
       );
     });
 
@@ -117,6 +122,7 @@ describe('SyncService — fertilizer guard', () => {
         farmId: 'farm-1',
         zoneId: null,
         gatewayId: null,
+        serial: null,
         hasFertilizer: false,
       });
       mockMqttService.publishToDevice.mockResolvedValue(undefined);
@@ -136,6 +142,7 @@ describe('SyncService — fertilizer guard', () => {
         'pump_on',
         {},
         null, // WiFi device — no gatewayId
+        null, // no serial
       );
     });
   });
@@ -146,6 +153,7 @@ describe('SyncService — fertilizer guard', () => {
         farmId: 'farm-1',
         zoneId: null,
         gatewayId: null,
+        serial: null,
         hasFertilizer: false,
       });
       mockMqttService.publishToDevice.mockResolvedValue(undefined);
@@ -157,14 +165,16 @@ describe('SyncService — fertilizer guard', () => {
         'pump_on',
         {},
         null,
+        null,
       );
     });
 
-    it('routes via gateway/{gwId}/device/{id}/cmd when gatewayId is set (LoRa mode)', async () => {
+    it('routes via gateway/{gwId}/device/{id}/cmd when gatewayId is set (LoRa mode) with serial', async () => {
       mockDeviceRepo.findOne.mockResolvedValue({
         farmId: 'farm-1',
         zoneId: null,
         gatewayId: 'gw-abc',
+        serial: 'SN-12345',
         hasFertilizer: false,
       });
       mockMqttService.publishToDevice.mockResolvedValue(undefined);
@@ -176,6 +186,7 @@ describe('SyncService — fertilizer guard', () => {
         'pump_on',
         {},
         'gw-abc',
+        'SN-12345',
       );
     });
   });

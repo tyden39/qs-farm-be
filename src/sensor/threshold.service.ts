@@ -124,14 +124,14 @@ export class ThresholdService {
       // Dispatch command (skip if ALERT_ONLY)
       if (threshold.action !== 'ALERT_ONLY') {
         try {
-          const device = await this.deviceRepo.findOne({ where: { id: deviceId }, select: ['id', 'gatewayId'] });
+          const device = await this.deviceRepo.findOne({ where: { id: deviceId }, select: ['id', 'gatewayId', 'serial'] });
           await this.mqttService.publishToDevice(deviceId, threshold.action, {
             reason,
             sensorType,
             level: threshold.level,
             value,
             threshold: thresholdValue,
-          }, device?.gatewayId);
+          }, device?.gatewayId, device?.serial);
 
           this.deviceGateway.broadcastDeviceData(
             deviceId,

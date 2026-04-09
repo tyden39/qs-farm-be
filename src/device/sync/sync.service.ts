@@ -24,7 +24,7 @@ export class SyncService implements OnModuleInit {
   // deviceId → { farmId, zoneId, gatewayId } cache (60s TTL)
   private deviceContextCache: Map<
     string,
-    { farmId: string | null; zoneId: string | null; gatewayId: string | null; loadedAt: number }
+    { farmId: string | null; zoneId: string | null; gatewayId: string | null; serial: string | null; loadedAt: number }
   > = new Map();
   private readonly FARM_CACHE_TTL = 60_000;
 
@@ -111,20 +111,21 @@ export class SyncService implements OnModuleInit {
 
   private async getDeviceIds(
     deviceId: string,
-  ): Promise<{ farmId: string | null; zoneId: string | null; gatewayId: string | null }> {
+  ): Promise<{ farmId: string | null; zoneId: string | null; gatewayId: string | null; serial: string | null }> {
     const cached = this.deviceContextCache.get(deviceId);
     if (cached && Date.now() - cached.loadedAt < this.FARM_CACHE_TTL) {
-      return { farmId: cached.farmId, zoneId: cached.zoneId, gatewayId: cached.gatewayId };
+      return { farmId: cached.farmId, zoneId: cached.zoneId, gatewayId: cached.gatewayId, serial: cached.serial };
     }
     const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
     const entry = {
       farmId: device?.farmId ?? null,
       zoneId: device?.zoneId ?? null,
       gatewayId: device?.gatewayId ?? null,
+      serial: device?.serial ?? null,
       loadedAt: Date.now(),
     };
     this.deviceContextCache.set(deviceId, entry);
-    return { farmId: entry.farmId, zoneId: entry.zoneId, gatewayId: entry.gatewayId };
+    return { farmId: entry.farmId, zoneId: entry.zoneId, gatewayId: entry.gatewayId, serial: entry.serial };
   }
 
   /**
@@ -365,7 +366,7 @@ export class SyncService implements OnModuleInit {
   async sendCommandToDevice(deviceId: string, command: string, params: any) {
     this.logger.log(`Sending command to device ${deviceId}: ${command}`);
 
-    const { farmId, gatewayId } = await this.getDeviceIds(deviceId);
+    const { farmId, gatewayId, serial } = await this.getDeviceIds(deviceId);
 
     // Guard: fertilizer commands require hasFertilizer=true on the device
     if (command.startsWith('fertilizer_')) {
@@ -378,7 +379,7 @@ export class SyncService implements OnModuleInit {
     }
 
     try {
-      await this.mqttService.publishToDevice(deviceId, command, params, gatewayId);
+      await this.mqttService.publishToDevice(deviceId, command, params, gatewayId, serial);
 
       // Notify mobile app that command was sent
       this.deviceGateway.broadcastDeviceStatus(
