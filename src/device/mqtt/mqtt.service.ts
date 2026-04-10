@@ -234,7 +234,7 @@ export class MqttService implements OnModuleInit {
    * Otherwise (WiFi direct), publishes to:
    *   device/{deviceId}/cmd
    */
-  async publishToDevice(deviceId: string, command: string, data: any, gatewayId?: string | null, serial?: string | null) {
+  async publishToDevice(deviceId: string, command: string, data: any, gatewayId?: string | null, mac?: string | null) {
     const topic = gatewayId
       ? `gateway/${gatewayId}/device/${deviceId}/cmd`
       : `device/${deviceId}/cmd`;
@@ -244,9 +244,9 @@ export class MqttService implements OnModuleInit {
       timestamp: new Date().toISOString(),
     };
 
-    // Include device serial so gateway can identify the target LoRa device
-    if (gatewayId && serial) {
-      payload.serial = serial;
+    // Include device MAC so gateway can identify the target LoRa device
+    if (gatewayId && mac) {
+      payload.mac = mac;
     }
 
     return this.publishToTopic(topic, payload);

@@ -39,6 +39,9 @@ export class Device {
   @Column({ length: 100, unique: true, nullable: true })
   serial: string;
 
+  @Column({ length: 17, unique: true, nullable: true })
+  mac: string;
+
   @Column({ length: 50, nullable: true })
   hardwareVersion: string;
 

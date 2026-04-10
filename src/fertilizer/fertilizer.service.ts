@@ -16,6 +16,7 @@ import { ThresholdLevel } from 'src/sensor/enums/threshold-level.enum';
 import { TimeBucket } from 'src/sensor/enums/time-bucket.enum';
 import { MqttService } from 'src/device/mqtt/mqtt.service';
 import { DeviceGateway } from 'src/device/websocket/device.gateway';
+import { Device } from 'src/device/entities/device.entity';
 
 // Fertilizer event interfaces
 export interface FertilizerStartedEvent {
@@ -57,6 +58,8 @@ export class FertilizerService {
     private readonly sensorDataRepo: Repository<SensorData>,
     @InjectRepository(AlertLog)
     private readonly alertLogRepo: Repository<AlertLog>,
+    @InjectRepository(Device)
+    private readonly deviceRepo: Repository<Device>,
     private readonly mqttService: MqttService,
     private readonly deviceGateway: DeviceGateway,
   ) {}
@@ -247,10 +250,18 @@ export class FertilizerService {
 
   private async publishSessionId(deviceId: string, sessionId: string) {
     try {
-      await this.mqttService.publishToTopic(`device/${deviceId}/fert-session`, {
+      const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
+      const topic = device?.gatewayId
+        ? `gateway/${device.gatewayId}/device/${deviceId}/fert-session`
+        : `device/${deviceId}/fert-session`;
+      const payload: Record<string, any> = {
         sessionId,
         timestamp: new Date().toISOString(),
-      });
+      };
+      if (device?.gatewayId && device?.mac) {
+        payload.mac = device.mac;
+      }
+      await this.mqttService.publishToTopic(topic, payload);
     } catch (error) {
       this.logger.error(
         `Failed to publish fertilizer sessionId to device ${deviceId}:`,

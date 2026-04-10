@@ -21,10 +21,10 @@ import { ControlMode } from 'src/shared/enums/control-mode.enum';
 export class SyncService implements OnModuleInit {
   private readonly logger = new Logger(SyncService.name);
 
-  // deviceId → { farmId, zoneId, gatewayId } cache (60s TTL)
+  // deviceId → { farmId, zoneId, gatewayId, mac } cache (60s TTL)
   private deviceContextCache: Map<
     string,
-    { farmId: string | null; zoneId: string | null; gatewayId: string | null; serial: string | null; loadedAt: number }
+    { farmId: string | null; zoneId: string | null; gatewayId: string | null; mac: string | null; loadedAt: number }
   > = new Map();
   private readonly FARM_CACHE_TTL = 60_000;
 
@@ -95,6 +95,7 @@ export class SyncService implements OnModuleInit {
     try {
       const result = await this.provisionService.handleProvisionRequest({
         serial: payload.serial,
+        mac: payload.mac,
         hw: payload.hw,
         fw: payload.fw,
         nonce: payload.nonce,
@@ -111,21 +112,21 @@ export class SyncService implements OnModuleInit {
 
   private async getDeviceIds(
     deviceId: string,
-  ): Promise<{ farmId: string | null; zoneId: string | null; gatewayId: string | null; serial: string | null }> {
+  ): Promise<{ farmId: string | null; zoneId: string | null; gatewayId: string | null; mac: string | null }> {
     const cached = this.deviceContextCache.get(deviceId);
     if (cached && Date.now() - cached.loadedAt < this.FARM_CACHE_TTL) {
-      return { farmId: cached.farmId, zoneId: cached.zoneId, gatewayId: cached.gatewayId, serial: cached.serial };
+      return { farmId: cached.farmId, zoneId: cached.zoneId, gatewayId: cached.gatewayId, mac: cached.mac };
     }
     const device = await this.deviceRepo.findOne({ where: { id: deviceId } });
     const entry = {
       farmId: device?.farmId ?? null,
       zoneId: device?.zoneId ?? null,
       gatewayId: device?.gatewayId ?? null,
-      serial: device?.serial ?? null,
+      mac: device?.mac ?? null,
       loadedAt: Date.now(),
     };
     this.deviceContextCache.set(deviceId, entry);
-    return { farmId: entry.farmId, zoneId: entry.zoneId, gatewayId: entry.gatewayId, serial: entry.serial };
+    return { farmId: entry.farmId, zoneId: entry.zoneId, gatewayId: entry.gatewayId, mac: entry.mac };
   }
 
   /**
@@ -366,7 +367,7 @@ export class SyncService implements OnModuleInit {
   async sendCommandToDevice(deviceId: string, command: string, params: any) {
     this.logger.log(`Sending command to device ${deviceId}: ${command}`);
 
-    const { farmId, gatewayId, serial } = await this.getDeviceIds(deviceId);
+    const { farmId, gatewayId, mac } = await this.getDeviceIds(deviceId);
 
     // Guard: fertilizer commands require hasFertilizer=true on the device
     if (command.startsWith('fertilizer_')) {
@@ -379,7 +380,7 @@ export class SyncService implements OnModuleInit {
     }
 
     try {
-      await this.mqttService.publishToDevice(deviceId, command, params, gatewayId, serial);
+      await this.mqttService.publishToDevice(deviceId, command, params, gatewayId, mac);
 
       // Notify mobile app that command was sent
       this.deviceGateway.broadcastDeviceStatus(

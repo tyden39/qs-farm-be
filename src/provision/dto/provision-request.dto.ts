@@ -12,6 +12,10 @@ export class ProvisionRequestDto {
   @IsString()
   fw?: string;
 
+  @IsOptional()
+  @IsString()
+  mac?: string;
+
   @IsString()
   nonce: string; // Required for response topic
 

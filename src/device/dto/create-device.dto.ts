@@ -27,6 +27,10 @@ export class CreateDeviceDto {
 
   @IsOptional()
   @IsString()
+  readonly mac?: string;
+
+  @IsOptional()
+  @IsString()
   readonly hardwareVersion?: string;
 
   @IsUUID()
