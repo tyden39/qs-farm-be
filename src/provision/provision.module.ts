@@ -1,15 +1,15 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProvisionService } from './provision.service';
 import { ProvisionController } from './provision.controller';
 import { Device } from 'src/device/entities/device.entity';
 import { PairingToken } from 'src/device/entities/pairing-token.entity';
 import { Gateway } from 'src/gateway/entities/gateway.entity';
-import { MqttService } from 'src/device/mqtt/mqtt.service';
+import { DeviceModule } from 'src/device/device.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Device, PairingToken, Gateway])],
-  providers: [ProvisionService, MqttService],
+  imports: [TypeOrmModule.forFeature([Device, PairingToken, Gateway]), forwardRef(() => DeviceModule)],
+  providers: [ProvisionService],
   controllers: [ProvisionController],
   exports: [ProvisionService],
 })

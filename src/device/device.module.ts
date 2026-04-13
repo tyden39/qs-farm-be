@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 
@@ -36,7 +36,7 @@ import { UserModule } from 'src/user/user.module';
       secret: process.env.JWT_ACCESS_SECRET,
       signOptions: { expiresIn: process.env.JWT_ACCESS_EXPIRE },
     }),
-    ProvisionModule,
+    forwardRef(() => ProvisionModule),
     UserModule,
   ],
   controllers: [DeviceController],

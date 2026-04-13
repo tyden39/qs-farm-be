@@ -3,6 +3,8 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
@@ -25,6 +27,7 @@ export class ProvisionService {
     private readonly pairingTokenRepository: Repository<PairingToken>,
     @InjectRepository(Gateway)
     private readonly gatewayRepository: Repository<Gateway>,
+    @Inject(forwardRef(() => MqttService))
     private readonly mqttService: MqttService,
   ) {}
 
