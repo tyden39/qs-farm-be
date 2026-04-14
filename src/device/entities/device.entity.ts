@@ -64,7 +64,7 @@ export class Device {
   @Column({ nullable: true })
   pairedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   lastSeenAt: Date;
 
   // Gateway that this device connects through (null = direct WiFi)

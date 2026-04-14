@@ -44,7 +44,7 @@ export class Gateway {
   @JoinColumn({ name: 'farmId' })
   farm: Farm;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   lastSeenAt: Date;
 
   // Provision state: nonce, pairingToken, expiry, used flag

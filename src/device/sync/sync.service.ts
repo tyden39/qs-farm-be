@@ -182,7 +182,7 @@ export class SyncService implements OnModuleInit {
       .createQueryBuilder()
       .update()
       .set({ lastSeenAt: () => 'NOW()' })
-      .where('id = :id AND (lastSeenAt IS NULL OR lastSeenAt < NOW() - INTERVAL \'30 seconds\')', { id: deviceId })
+      .where('id = :id AND ("lastSeenAt" IS NULL OR "lastSeenAt" < NOW() - INTERVAL \'30 seconds\')', { id: deviceId })
       .execute();
 
     const { farmId, zoneId } = await this.getDeviceIds(deviceId);
