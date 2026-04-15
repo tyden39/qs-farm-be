@@ -110,7 +110,7 @@ The IoT Farm Management Platform follows a phased development approach, progress
 ### Status: IN PROGRESS
 **Timeline:** March 2026 - April 2026 (estimated)
 **Priority:** High
-**Completion:** Milestone 1 started 2026-03-16 with pump and firmware modules; Milestone 2 (2026-04-07) added gateway-device enforcement
+**Completion:** Milestone 1 started 2026-03-16 with pump and firmware modules; Milestone 2 (2026-04-07) added gateway-device enforcement; Milestone 3 (2026-04-15) added mobile-triggered gateway OTA endpoint
 
 ### Completed Sub-features
 
@@ -122,6 +122,14 @@ The IoT Farm Management Platform follows a phased development approach, progress
 - ✅ Auto-discovery: gateway publishes device serials → server auto-assigns
 - ✅ 3 new REST endpoints: assign/unassign/find devices per gateway
 - ✅ Event-driven cache invalidation on device assignment changes
+
+#### 3.0.1 Mobile-Triggered Gateway OTA Endpoint (v1.5.3)
+- ✅ New REST endpoint `POST /api/firmware/:id/deploy-gateways` (JWT protected)
+- ✅ Dual selection mode: `farmId` (all gateways in farm) or explicit `gatewayIds[]`
+- ✅ Firmware publish check (`isPublished=true` required)
+- ✅ Farm-ownership enforcement per gateway (rejects unowned gateways)
+- ✅ Rejects unpaired gateways (no `farmId`)
+- ✅ WebSocket `firmwareUpdate` flow refactored to share same ownership-checked path
 
 ### Planned Features
 

@@ -2,6 +2,34 @@
 
 All notable changes to the IoT Farm Management Platform are documented in this file.
 
+## Version 1.5.3 (2026-04-15)
+
+### Added: Mobile-Triggered Gateway OTA Endpoint
+
+**Feature:** REST endpoint for mobile apps to trigger gateway firmware OTA with ownership and publish checks
+
+- **New Endpoint:** `POST /api/firmware/:id/deploy-gateways` (JWT protected)
+- **DTO:** `DeployFirmwareDto` extended with optional `gatewayIds: string[]` (UUID array)
+- **Selection Modes:**
+  - By `farmId` → deploys to all gateways in the farm (farm ownership verified)
+  - By `gatewayIds[]` → deploys to explicit gateways (each gateway's farm ownership verified)
+- **Guards:**
+  - Firmware must be published (`isPublished=true`) → `BadRequestException` otherwise
+  - Gateway must be paired to a farm → `ForbiddenException` otherwise
+  - Farm must belong to the caller (`farm.userId === user.id`) → `ForbiddenException` otherwise
+  - Neither `gatewayIds` nor `farmId` supplied → `BadRequestException`
+- **Flow:** `FirmwareController.deployGateways()` → `FirmwareService.deployGatewaysForUser()` → `deployToGateways()` (existing MQTT publish path)
+- **Refactor:** WebSocket-triggered deploy (`firmwareUpdate` event) now also routes through `deployGatewaysForUser()` for consistent ownership enforcement
+- **Files Modified:**
+  - `src/firmware/dto/deploy-firmware.dto.ts` - added `gatewayIds` field
+  - `src/firmware/firmware.controller.ts` - new `deployGateways` route handler
+  - `src/firmware/firmware.service.ts` - new `deployGatewaysForUser` method, WebSocket handler updated
+- **Plan:** `plans/260415-1124-gateway-ota-mobile-api/`
+- **Test Guide:** `plans/test-guides/ota-flow-happy-path.md`
+- **Status:** Implemented and committed (b6f453a)
+
+---
+
 ## Version 1.5.2 (2026-04-07)
 
 ### Added: Gateway-Device Enforcement
