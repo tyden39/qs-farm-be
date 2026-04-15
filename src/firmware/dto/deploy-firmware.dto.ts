@@ -8,6 +8,12 @@ export class DeployFirmwareDto {
   @IsUUID('4', { each: true })
   deviceIds?: string[];
 
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  gatewayIds?: string[];
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsUUID()

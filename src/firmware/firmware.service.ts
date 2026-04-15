@@ -391,7 +391,11 @@ export class FirmwareService {
     try {
       // Gateway OTA takes priority
       if (data.gatewayIds?.length) {
-        const result = await this.deployToGateways(data.firmwareId, data.gatewayIds);
+        const result = await this.deployGatewaysForUser(
+          data.firmwareId,
+          { gatewayIds: data.gatewayIds },
+          data.userId,
+        );
         this.deviceGateway.server.to(data.socketId).emit('firmwareUpdateAck', result);
         return;
       }
@@ -410,6 +414,48 @@ export class FirmwareService {
         .to(data.socketId)
         .emit('firmwareUpdateError', { message: error.message });
     }
+  }
+
+  async deployGatewaysForUser(
+    firmwareId: string,
+    dto: DeployFirmwareDto,
+    userId: string,
+  ) {
+    const firmware = await this.findOne(firmwareId);
+    if (!firmware.isPublished) {
+      throw new BadRequestException('Firmware not published');
+    }
+
+    let gatewayIds: string[];
+
+    if (dto.farmId) {
+      const farm = await this.farmService.findOne(dto.farmId);
+      if (farm.userId !== userId) {
+        throw new ForbiddenException('You do not own this farm');
+      }
+      const gateways = await this.gatewayService.findByFarm(dto.farmId);
+      gatewayIds = gateways.map((g) => g.id);
+    } else if (dto.gatewayIds?.length) {
+      for (const gwId of dto.gatewayIds) {
+        const gateway = await this.gatewayService.findOne(gwId);
+        if (!gateway.farmId) {
+          throw new ForbiddenException(`Gateway ${gwId} not paired to any farm`);
+        }
+        const farm = await this.farmService.findOne(gateway.farmId);
+        if (farm.userId !== userId) {
+          throw new ForbiddenException(`Gateway ${gwId} not owned by you`);
+        }
+      }
+      gatewayIds = dto.gatewayIds;
+    } else {
+      throw new BadRequestException('Provide gatewayIds or farmId');
+    }
+
+    if (gatewayIds.length === 0) {
+      return { firmwareId: firmware.id, version: firmware.version, results: [] };
+    }
+
+    return this.deployToGateways(firmwareId, gatewayIds);
   }
 
   private async deployToGateways(firmwareId: string, gatewayIds: string[]) {

@@ -124,6 +124,17 @@ export class FirmwareController {
     return this.firmwareService.deploy(id, dto);
   }
 
+  @Post(':id/deploy-gateways')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async deployGateways(
+    @Param('id') id: string,
+    @Body() dto: DeployFirmwareDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.firmwareService.deployGatewaysForUser(id, dto, user.id);
+  }
+
   @Get(':id/deploy-status')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
