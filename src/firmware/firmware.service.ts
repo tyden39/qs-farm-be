@@ -508,7 +508,7 @@ export class FirmwareService {
     const rows = await this.updateLogRepository.find({
       where,
       order: { createdAt: 'DESC' },
-      relations: ['firmware', 'device'],
+      relations: ['device'],
       skip: (page - 1) * limit,
       take: limit + 1,
     });
