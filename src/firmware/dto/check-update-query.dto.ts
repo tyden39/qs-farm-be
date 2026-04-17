@@ -1,5 +1,6 @@
-import { IsOptional, IsUUID, IsString } from 'class-validator';
+import { IsOptional, IsUUID, IsString, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { FirmwareTargetType } from './upload-firmware.dto';
 
 export class CheckUpdateQueryDto {
   @ApiProperty({ required: false })
@@ -16,4 +17,9 @@ export class CheckUpdateQueryDto {
   @IsOptional()
   @IsString()
   hardwareModel?: string;
+
+  @ApiProperty({ required: false, enum: ['device', 'gateway'], default: 'device' })
+  @IsOptional()
+  @IsIn(['device', 'gateway'])
+  targetType?: FirmwareTargetType;
 }

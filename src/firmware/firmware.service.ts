@@ -72,6 +72,7 @@ export class FirmwareService {
     const firmware = this.firmwareRepository.create({
       version: dto.version,
       hardwareModel: dto.hardwareModel,
+      targetType: dto.targetType ?? 'device',
       releaseNotes: dto.releaseNotes,
       fileName: file.originalname,
       filePath: file.path,
@@ -85,8 +86,10 @@ export class FirmwareService {
     return saved;
   }
 
-  async findAll(hardwareModel?: string) {
-    const where = hardwareModel ? { hardwareModel } : {};
+  async findAll(hardwareModel?: string, targetType?: 'device' | 'gateway') {
+    const where: any = {};
+    if (hardwareModel) where.hardwareModel = hardwareModel;
+    if (targetType) where.targetType = targetType;
     return this.firmwareRepository.find({
       where,
       order: { createdAt: 'DESC' },
@@ -101,9 +104,12 @@ export class FirmwareService {
     return firmware;
   }
 
-  async findLatestPublished(hardwareModel: string) {
+  async findLatestPublished(
+    hardwareModel: string,
+    targetType: 'device' | 'gateway' = 'device',
+  ) {
     return this.firmwareRepository.findOne({
-      where: { hardwareModel, isPublished: true },
+      where: { hardwareModel, targetType, isPublished: true },
       order: { createdAt: 'DESC' },
     });
   }
@@ -158,6 +164,7 @@ export class FirmwareService {
 
   async checkForUpdate(query: CheckUpdateQueryDto) {
     let hardwareModel = query.hardwareModel;
+    const targetType = query.targetType ?? 'device';
 
     if (query.deviceId) {
       const device = await this.deviceService.findOne(query.deviceId);
@@ -168,7 +175,7 @@ export class FirmwareService {
       return { updateAvailable: false };
     }
 
-    const latest = await this.findLatestPublished(hardwareModel);
+    const latest = await this.findLatestPublished(hardwareModel, targetType);
 
     if (!latest || latest.version === query.currentVersion) {
       return { updateAvailable: false };
@@ -188,6 +195,12 @@ export class FirmwareService {
 
   async deploy(firmwareId: string, dto: DeployFirmwareDto) {
     const firmware = await this.findOne(firmwareId);
+
+    if (firmware.targetType !== 'device') {
+      throw new BadRequestException(
+        `Firmware ${firmware.version} is for ${firmware.targetType}, not device`,
+      );
+    }
 
     // Resolve target devices
     let devices;
@@ -424,6 +437,11 @@ export class FirmwareService {
     const firmware = await this.findOne(firmwareId);
     if (!firmware.isPublished) {
       throw new BadRequestException('Firmware not published');
+    }
+    if (firmware.targetType !== 'gateway') {
+      throw new BadRequestException(
+        `Firmware ${firmware.version} is for ${firmware.targetType}, not gateway`,
+      );
     }
 
     let gatewayIds: string[];

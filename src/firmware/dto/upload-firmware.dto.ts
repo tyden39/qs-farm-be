@@ -1,5 +1,7 @@
-import { IsString, IsOptional, Matches } from 'class-validator';
+import { IsString, IsOptional, Matches, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
+export type FirmwareTargetType = 'device' | 'gateway';
 
 export class UploadFirmwareDto {
   @ApiProperty({
@@ -19,6 +21,16 @@ export class UploadFirmwareDto {
   @ApiProperty({ example: 'esp32', description: 'Hardware model identifier' })
   @IsString()
   hardwareModel: string;
+
+  @ApiProperty({
+    enum: ['device', 'gateway'],
+    default: 'device',
+    required: false,
+    description: 'Which target this firmware is for',
+  })
+  @IsOptional()
+  @IsIn(['device', 'gateway'])
+  targetType?: FirmwareTargetType;
 
   @ApiProperty({ example: 'Bug fixes and improvements', required: false })
   @IsOptional()

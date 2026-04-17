@@ -52,8 +52,11 @@ export class FirmwareController {
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async findAll(@Query('hardwareModel') hardwareModel?: string) {
-    return this.firmwareService.findAll(hardwareModel);
+  async findAll(
+    @Query('hardwareModel') hardwareModel?: string,
+    @Query('targetType') targetType?: 'device' | 'gateway',
+  ) {
+    return this.firmwareService.findAll(hardwareModel, targetType);
   }
 
   @Get('check')
