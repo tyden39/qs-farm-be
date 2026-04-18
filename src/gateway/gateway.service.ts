@@ -162,6 +162,11 @@ export class GatewayService {
     }
   }
 
+  async updateFirmwareVersion(id: string, version: string): Promise<void> {
+    await this.gatewayRepository.update(id, { firmwareVersion: version });
+    this.logger.log(`Gateway ${id} firmware version updated to ${version}`);
+  }
+
   async findDevicesByGateway(gatewayId: string): Promise<Device[]> {
     return this.deviceRepository.find({ where: { gatewayId } });
   }

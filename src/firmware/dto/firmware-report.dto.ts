@@ -1,11 +1,26 @@
-import { IsUUID, IsString, IsEnum, IsOptional, IsInt } from 'class-validator';
+import {
+  IsUUID,
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsInt,
+  ValidateIf,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { FirmwareUpdateStatus } from '../entities/firmware-update-log.entity';
 
 export class FirmwareReportDto {
-  @ApiProperty()
+  // Exactly one of deviceId / gatewayId must be provided.
+  // ValidateIf triggers UUID check only when the other field is absent.
+  @ApiProperty({ required: false, description: 'Required if gatewayId absent' })
+  @ValidateIf((o) => !o.gatewayId)
   @IsUUID()
-  deviceId: string;
+  deviceId?: string;
+
+  @ApiProperty({ required: false, description: 'Required if deviceId absent' })
+  @ValidateIf((o) => !o.deviceId)
+  @IsUUID()
+  gatewayId?: string;
 
   @ApiProperty({ example: '1.3.0' })
   @IsString()

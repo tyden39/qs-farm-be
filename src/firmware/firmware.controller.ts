@@ -66,11 +66,15 @@ export class FirmwareController {
 
   @Post('report')
   async report(@Body() dto: FirmwareReportDto) {
+    const target = dto.gatewayId
+      ? `gateway=${dto.gatewayId}`
+      : `device=${dto.deviceId}`;
     this.logger.log(
-      `ESP OTA report: device=${dto.deviceId} version=${dto.version} status=${dto.status}`,
+      `OTA report: ${target} version=${dto.version} status=${dto.status}`,
     );
     return this.firmwareService.handleUpdateReport({
       deviceId: dto.deviceId,
+      gatewayId: dto.gatewayId,
       version: dto.version,
       success: dto.status === FirmwareUpdateStatus.SUCCESS,
       errorMessage: dto.errorMessage,

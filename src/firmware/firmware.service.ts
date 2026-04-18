@@ -295,20 +295,29 @@ export class FirmwareService {
 
   @OnEvent('firmware.update.reported')
   async handleUpdateReport(data: {
-    deviceId: string;
+    deviceId?: string;
+    gatewayId?: string;
     version: string;
     success: boolean;
     errorMessage?: string;
     duration?: number;
     previousVersion?: string;
   }) {
+    const isGateway = !!data.gatewayId;
+    const target = isGateway
+      ? `gateway=${data.gatewayId}`
+      : `device=${data.deviceId}`;
     this.logger.log(
-      `OTA report received: device=${data.deviceId} version=${data.version} success=${data.success}`,
+      `OTA report received: ${target} version=${data.version} success=${data.success}`,
     );
 
-    // Find the pending log for this device
+    // Find pending log — lookup key depends on whether device or gateway reports
+    const whereClause = isGateway
+      ? { gatewayId: data.gatewayId, status: FirmwareUpdateStatus.PENDING }
+      : { deviceId: data.deviceId, status: FirmwareUpdateStatus.PENDING };
+
     const log = await this.updateLogRepository.findOne({
-      where: { deviceId: data.deviceId, status: FirmwareUpdateStatus.PENDING },
+      where: whereClause,
       order: { createdAt: 'DESC' },
     });
 
@@ -329,7 +338,8 @@ export class FirmwareService {
       const newLog = this.updateLogRepository.create({
         firmwareId: firmware?.id ?? null,
         firmwareVersion: data.version,
-        deviceId: data.deviceId,
+        deviceId: isGateway ? null : data.deviceId,
+        gatewayId: isGateway ? data.gatewayId : null,
         previousVersion: data.previousVersion,
         status: data.success
           ? FirmwareUpdateStatus.SUCCESS
@@ -340,29 +350,38 @@ export class FirmwareService {
       });
       const saved = await this.updateLogRepository.save(newLog);
       this.logger.log(
-        `OTA log created (self-initiated): logId=${saved.id} device=${data.deviceId} status=${saved.status}`,
+        `OTA log created (self-initiated): logId=${saved.id} ${target} status=${saved.status}`,
       );
     }
 
-    // Update device firmware version on success
+    // Update firmware version on success — device or gateway entity
     if (data.success) {
-      await this.deviceService.update(data.deviceId, {
-        firmwareVersion: data.version,
-      } as any);
+      if (isGateway) {
+        await this.gatewayService.updateFirmwareVersion(
+          data.gatewayId,
+          data.version,
+        );
+      } else {
+        await this.deviceService.update(data.deviceId, {
+          firmwareVersion: data.version,
+        } as any);
+      }
     }
 
-    // Broadcast status to WebSocket
-    this.deviceGateway.broadcastDeviceStatus(data.deviceId, {
-      type: 'firmwareUpdateStatus',
-      version: data.version,
-      status: data.success ? 'success' : 'failed',
-      errorMessage: data.errorMessage,
-      duration: data.duration,
-      timestamp: new Date().toISOString(),
-    });
+    // WebSocket broadcast only for device reports (no gateway room today)
+    if (!isGateway) {
+      this.deviceGateway.broadcastDeviceStatus(data.deviceId, {
+        type: 'firmwareUpdateStatus',
+        version: data.version,
+        status: data.success ? 'success' : 'failed',
+        errorMessage: data.errorMessage,
+        duration: data.duration,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     this.logger.log(
-      `Firmware update report: device=${data.deviceId} version=${data.version} success=${data.success}`,
+      `Firmware update report: ${target} version=${data.version} success=${data.success}`,
     );
   }
 
