@@ -37,10 +37,10 @@ export class ProvisionService {
    */
   async handleProvisionRequest(payload: ProvisionRequestDto) {
     try {
-      const { serial, hw, fw, nonce, mac } = payload;
+      const { serial, hw, hwModel, fw, nonce, mac } = payload;
 
       this.logger.log(
-        `Provisioning request from serial: ${serial}, mac: ${mac}, hw: ${hw}, fw: ${fw}, nonce: ${nonce}`,
+        `Provisioning request from serial: ${serial}, mac: ${mac}, hw: ${hw}, hwModel: ${hwModel}, fw: ${fw}, nonce: ${nonce}`,
       );
 
       // Validate serial format
@@ -78,6 +78,7 @@ export class ProvisionService {
           serial,
           mac: mac || null,
           hardwareVersion: hw || null,
+          hwModel: hwModel || null,
           firmwareVersion: fw || null,
           status: DeviceStatus.PENDING,
           name: `Device-${serial.slice(-8)}`,
@@ -87,6 +88,7 @@ export class ProvisionService {
         });
       } else {
         device.hardwareVersion = hw || device.hardwareVersion;
+        device.hwModel = hwModel || device.hwModel;
         device.firmwareVersion = fw || device.firmwareVersion;
         if (mac) device.mac = mac;
         device.status = DeviceStatus.PENDING;

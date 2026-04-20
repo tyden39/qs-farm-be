@@ -45,6 +45,9 @@ export class Device {
   @Column({ length: 50, nullable: true })
   hardwareVersion: string;
 
+  @Column({ length: 50, nullable: true })
+  hwModel: string;
+
   @Column({ length: 20, nullable: true })
   firmwareVersion: string;
 

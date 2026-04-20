@@ -10,6 +10,10 @@ export class ProvisionRequestDto {
 
   @IsOptional()
   @IsString()
+  hwModel?: string;
+
+  @IsOptional()
+  @IsString()
   fw?: string;
 
   @IsOptional()
