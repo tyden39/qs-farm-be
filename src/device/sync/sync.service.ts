@@ -35,7 +35,7 @@ export class SyncService implements OnModuleInit {
     private readonly eventEmitter: EventEmitter2,
     @InjectRepository(Device)
     private readonly deviceRepo: Repository<Device>,
-  ) {}
+  ) { }
 
   onModuleInit() {
     this.setupMqttToWebSocketSync();
@@ -100,6 +100,7 @@ export class SyncService implements OnModuleInit {
         fw: payload.fw,
         nonce: payload.nonce,
         sig: payload.sig,
+        hwModel: payload.hwModel,
       });
 
       if (result) {
