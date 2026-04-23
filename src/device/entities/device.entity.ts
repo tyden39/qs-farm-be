@@ -78,10 +78,26 @@ export class Device {
   @JoinColumn({ name: 'gatewayId' })
   gateway: any;
 
-  @Column({ type: 'float', nullable: true })
+  @Column({
+    type: 'float',
+    nullable: true,
+    transformer: {
+      to: (v?: number) => v,
+      from: (v?: string | number | null) =>
+        v === null || v === undefined ? null : Number(v),
+    },
+  })
   operatingLifeHours: number;
 
-  @Column({ type: 'float', default: 0 })
+  @Column({
+    type: 'float',
+    default: 0,
+    transformer: {
+      to: (v?: number) => v,
+      from: (v?: string | number | null) =>
+        v === null || v === undefined ? 0 : Number(v),
+    },
+  })
   totalOperatingHours: number;
 
   @Column('uuid', { nullable: true })
