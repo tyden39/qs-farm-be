@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Interval } from '@nestjs/schedule';
 
@@ -530,6 +530,10 @@ export class PumpService {
   async getReport(deviceId: string, query: PumpReportQueryDto) {
     const from = query.from ? new Date(query.from) : new Date(0);
     const to = query.to ? new Date(query.to) : new Date();
+    // If `to` is a date-only string (no time component), include the full day
+    if (query.to && /^\d{4}-\d{2}-\d{2}$/.test(query.to)) {
+      to.setUTCHours(23, 59, 59, 999);
+    }
 
     const [summary, maintenanceInfo, timeline, sessions] = await Promise.all([
       this.getSummary(deviceId, from, to),
@@ -683,7 +687,7 @@ export class PumpService {
     return this.pumpSessionRepo.find({
       where: {
         deviceId,
-        startedAt: MoreThanOrEqual(from),
+        startedAt: Between(from, to),
       },
       order: { startedAt: 'DESC' },
       take: 100,
