@@ -535,14 +535,35 @@ export class PumpService {
       to.setUTCHours(23, 59, 59, 999);
     }
 
-    const [summary, maintenanceInfo, timeline, sessions] = await Promise.all([
-      this.getSummary(deviceId, from, to),
-      this.getMaintenanceInfo(deviceId),
-      this.getTimeline(deviceId, from, to),
-      this.getSessions(deviceId, from, to),
-    ]);
+    // Default page size: 100 for JSON pagination, 5000 for Excel bulk export.
+    // DTO already caps `limit` at 50000.
+    const isExcel = query.format === 'excel';
+    const limit = query.limit ?? (isExcel ? 5000 : 100);
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const skip = isExcel ? 0 : (page - 1) * limit;
 
-    return { summary, maintenanceInfo, timeline, sessions };
+    const [summary, maintenanceInfo, timeline, [sessions, total]] =
+      await Promise.all([
+        this.getSummary(deviceId, from, to),
+        this.getMaintenanceInfo(deviceId),
+        this.getTimeline(deviceId, from, to),
+        this.getSessions(deviceId, from, to, limit, skip),
+      ]);
+
+    return {
+      summary,
+      maintenanceInfo,
+      timeline,
+      sessions,
+      pagination: isExcel
+        ? undefined
+        : {
+            page,
+            limit,
+            total,
+            totalPages: limit > 0 ? Math.ceil(total / limit) : 0,
+          },
+    };
   }
 
   private async getSummary(deviceId: string, from: Date, to: Date) {
@@ -683,14 +704,21 @@ export class PumpService {
     };
   }
 
-  private async getSessions(deviceId: string, from: Date, to: Date) {
-    return this.pumpSessionRepo.find({
+  private async getSessions(
+    deviceId: string,
+    from: Date,
+    to: Date,
+    take: number,
+    skip: number,
+  ) {
+    return this.pumpSessionRepo.findAndCount({
       where: {
         deviceId,
         startedAt: Between(from, to),
       },
       order: { startedAt: 'DESC' },
-      take: 100,
+      take,
+      skip,
     });
   }
 
